@@ -28,7 +28,7 @@
         android:required="true" />
 
     <application
-        android:label="BLE Attendance"
+        android:label="Attendximity"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

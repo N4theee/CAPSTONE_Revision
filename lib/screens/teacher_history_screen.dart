@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
-import '../ui/professor_attendance_ui.dart';
+import '../ui/teacher_attendance_ui.dart';
 import '../ui/responsive.dart';
-import 'professor_session_detail_screen.dart';
+import 'teacher_session_detail_screen.dart';
 
-class ProfessorHistoryScreen extends StatefulWidget {
-  const ProfessorHistoryScreen({
+class TeacherHistoryScreen extends StatefulWidget {
+  const TeacherHistoryScreen({
     super.key,
-    required this.professorId,
+    required this.teacherId,
   });
 
-  final String professorId;
+  final String teacherId;
 
   @override
-  State<ProfessorHistoryScreen> createState() => _ProfessorHistoryScreenState();
+  State<TeacherHistoryScreen> createState() => _TeacherHistoryScreenState();
 }
 
-class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
+class _TeacherHistoryScreenState extends State<TeacherHistoryScreen> {
   final _db = SupabaseService();
   bool _loading = true;
   String? _error;
-  List<ProfessorSessionHistoryItem> _history = [];
+  List<TeacherSessionHistoryItem> _history = [];
   DateTimeRange? _dateRange;
   String? _subjectFilter;
   String? _sectionFilter;
@@ -38,7 +38,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
       _error = null;
     });
     try {
-      final rows = await _db.getProfessorSessionHistory(widget.professorId);
+      final rows = await _db.getTeacherSessionHistory(widget.teacherId);
       if (!mounted) return;
       setState(() {
         _history = rows;
@@ -69,7 +69,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
     return '$y-$m-$d';
   }
 
-  List<ProfessorSessionHistoryItem> get _filteredHistory {
+  List<TeacherSessionHistoryItem> get _filteredHistory {
     return _history.where((item) {
       if (_dateRange != null) {
         final end = _dateRange!.end.add(const Duration(days: 1));
@@ -100,13 +100,13 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
         return Theme(
           data: base.copyWith(
             colorScheme: ColorScheme.dark(
-              primary: ProfessorAttendanceUi.accentPurple,
+              primary: TeacherAttendanceUi.accentPurple,
               onPrimary: Colors.white,
-              surface: ProfessorAttendanceUi.surface,
+              surface: TeacherAttendanceUi.surface,
               onSurface: Colors.white,
             ),
             dialogTheme: const DialogThemeData(
-              backgroundColor: ProfessorAttendanceUi.surface,
+              backgroundColor: TeacherAttendanceUi.surface,
             ),
           ),
           child: child ?? const SizedBox.shrink(),
@@ -118,13 +118,13 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
   }
 
   Future<void> _clearHistory() async {
-    final themed = ProfessorAttendanceUi.themeOverlay(Theme.of(context));
+    final themed = TeacherAttendanceUi.themeOverlay(Theme.of(context));
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Theme(
         data: themed,
         child: AlertDialog(
-          backgroundColor: ProfessorAttendanceUi.surface,
+          backgroundColor: TeacherAttendanceUi.surface,
           title: const Text('Clear History'),
           content: const Text(
             'Delete all your session history? This cannot be undone.',
@@ -144,7 +144,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
     );
     if (ok != true || !mounted) return;
     try {
-      await _db.clearProfessorHistory(widget.professorId);
+      await _db.clearTeacherHistory(widget.teacherId);
       if (!mounted) return;
       setState(() {
         _subjectFilter = null;
@@ -165,7 +165,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
     }
   }
 
-  void _openSessionDetail(ProfessorSessionHistoryItem item) {
+  void _openSessionDetail(TeacherSessionHistoryItem item) {
     if (item.sessionId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -174,14 +174,14 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
       );
       return;
     }
-    final overlay = ProfessorAttendanceUi.themeOverlay(Theme.of(context));
+    final overlay = TeacherAttendanceUi.themeOverlay(Theme.of(context));
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
         builder: (ctx) => Theme(
           data: overlay,
-          child: ProfessorSessionDetailScreen(
-            professorId: widget.professorId,
+          child: TeacherSessionDetailScreen(
+            teacherId: widget.teacherId,
             session: item,
           ),
         ),
@@ -192,7 +192,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final baseTheme = Theme.of(context);
-    final historyTheme = ProfessorAttendanceUi.themeOverlay(baseTheme);
+    final historyTheme = TeacherAttendanceUi.themeOverlay(baseTheme);
 
     return Theme(
       data: historyTheme,
@@ -228,7 +228,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
                                 'Failed to load history.\n$_error',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: ProfessorAttendanceUi.textSecondary,
+                                  color: TeacherAttendanceUi.textSecondary,
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -248,7 +248,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
                         child: Text(
                           'No session history yet.',
                           style: TextStyle(
-                            color: ProfessorAttendanceUi.textSecondary,
+                            color: TeacherAttendanceUi.textSecondary,
                           ),
                         ),
                       )
@@ -288,7 +288,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
                               labelText: 'Subject',
                             ),
                             isExpanded: true,
-                            dropdownColor: ProfessorAttendanceUi.surface,
+                            dropdownColor: TeacherAttendanceUi.surface,
                             style: const TextStyle(color: Colors.white),
                             items: [
                               const DropdownMenuItem<String>(
@@ -320,7 +320,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
                               labelText: 'Section',
                             ),
                             isExpanded: true,
-                            dropdownColor: ProfessorAttendanceUi.surface,
+                            dropdownColor: TeacherAttendanceUi.surface,
                             style: const TextStyle(color: Colors.white),
                             items: [
                               const DropdownMenuItem<String>(
@@ -414,7 +414,7 @@ class _ProfessorHistoryScreenState extends State<ProfessorHistoryScreen> {
                                             'No sessions match your filters.',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              color: ProfessorAttendanceUi
+                                              color: TeacherAttendanceUi
                                                   .textSecondary,
                                             ),
                                           ),
@@ -495,15 +495,15 @@ class _HistoryDateFilterPanel extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: ProfessorAttendanceUi.accentPurple.withValues(alpha: 0.2),
+        color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: ProfessorAttendanceUi.accentPurple.withValues(alpha: 0.45),
+          color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.45),
         ),
       ),
       child: const Icon(
         Icons.date_range_rounded,
-        color: ProfessorAttendanceUi.accentPurple,
+        color: TeacherAttendanceUi.accentPurple,
         size: 22,
       ),
     );
@@ -516,7 +516,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
           const Text(
             'Date filter',
             style: TextStyle(
-              color: ProfessorAttendanceUi.textSecondary,
+              color: TeacherAttendanceUi.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -536,7 +536,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
           Text(
             sub,
             style: TextStyle(
-              color: ProfessorAttendanceUi.textSecondary.withValues(
+              color: TeacherAttendanceUi.textSecondary.withValues(
                 alpha: 0.95,
               ),
               fontSize: 11,
@@ -556,7 +556,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
       style: FilledButton.styleFrom(
         foregroundColor: Colors.white,
         backgroundColor:
-            ProfessorAttendanceUi.accentPurple.withValues(alpha: 0.35),
+            TeacherAttendanceUi.accentPurple.withValues(alpha: 0.35),
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 12 : 16,
           vertical: 10,
@@ -569,12 +569,12 @@ class _HistoryDateFilterPanel extends StatelessWidget {
             tooltip: 'Clear date filter',
             onPressed: onClearRange,
             icon: const Icon(Icons.close_rounded),
-            color: ProfessorAttendanceUi.textSecondary,
+            color: TeacherAttendanceUi.textSecondary,
           )
         : null;
 
     return Material(
-      color: ProfessorAttendanceUi.surface,
+      color: TeacherAttendanceUi.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -597,7 +597,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
                               const Text(
                                 'Date filter',
                                 style: TextStyle(
-                                  color: ProfessorAttendanceUi.textSecondary,
+                                  color: TeacherAttendanceUi.textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -623,7 +623,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
                     Text(
                       sub,
                       style: TextStyle(
-                        color: ProfessorAttendanceUi.textSecondary.withValues(
+                        color: TeacherAttendanceUi.textSecondary.withValues(
                           alpha: 0.95,
                         ),
                         fontSize: 11,
@@ -670,7 +670,7 @@ class _SessionHistoryCard extends StatelessWidget {
     this.tightLayout = false,
   });
 
-  final ProfessorSessionHistoryItem item;
+  final TeacherSessionHistoryItem item;
   final String Function(DateTime) formatDate;
   final VoidCallback onTap;
   final bool tightLayout;
@@ -682,23 +682,23 @@ class _SessionHistoryCard extends StatelessWidget {
         : formatDate(item.endedAt!);
     final titleLines = tightLayout ? 1 : 2;
     final timeStyle = TextStyle(
-      color: ProfessorAttendanceUi.textSecondary,
+      color: TeacherAttendanceUi.textSecondary,
       fontSize: tightLayout ? 10 : 11,
     );
 
     final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ProfessorAttendanceUi.accentPurple.withValues(alpha: 0.2),
+        color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: ProfessorAttendanceUi.accentPurple.withValues(alpha: 0.55),
+          color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.55),
         ),
       ),
       child: Text(
         item.isActive ? 'Active' : 'Done',
         style: const TextStyle(
-          color: ProfessorAttendanceUi.accentPurple,
+          color: TeacherAttendanceUi.accentPurple,
           fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
@@ -708,7 +708,7 @@ class _SessionHistoryCard extends StatelessWidget {
     );
 
     return Material(
-      color: ProfessorAttendanceUi.surface,
+      color: TeacherAttendanceUi.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -727,17 +727,17 @@ class _SessionHistoryCard extends StatelessWidget {
                 width: tightLayout ? 40 : 46,
                 height: tightLayout ? 40 : 46,
                 decoration: BoxDecoration(
-                  color: ProfessorAttendanceUi.accentPurple
+                  color: TeacherAttendanceUi.accentPurple
                       .withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: ProfessorAttendanceUi.accentPurple
+                    color: TeacherAttendanceUi.accentPurple
                         .withValues(alpha: 0.45),
                   ),
                 ),
                 child: Icon(
                   Icons.event_available_rounded,
-                  color: ProfessorAttendanceUi.accentPurple,
+                  color: TeacherAttendanceUi.accentPurple,
                   size: tightLayout ? 22 : 24,
                 ),
               ),
@@ -764,7 +764,7 @@ class _SessionHistoryCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: ProfessorAttendanceUi.textSecondary,
+                        color: TeacherAttendanceUi.textSecondary,
                         fontSize: tightLayout ? 10.5 : 11.5,
                       ),
                     ),

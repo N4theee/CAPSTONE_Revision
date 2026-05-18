@@ -623,7 +623,7 @@ class _HistoryListCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Section ${item.section} • ${item.professorName}',
+                      'Section ${item.section} • ${item.teacherName}',
                       style: const TextStyle(
                         color: StudentAttendanceUi.textSecondary,
                         fontSize: 12,

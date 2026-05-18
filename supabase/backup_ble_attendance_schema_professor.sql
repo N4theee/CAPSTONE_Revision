@@ -1,3 +1,17 @@
+﻿-- =============================================================================
+-- BACKUP REFERENCE: schema with "professor" naming (before teacher rename)
+-- =============================================================================
+-- This file is a SNAPSHOT of your schema definition (tables, functions, RLS).
+-- It does NOT include your live row data (student accounts, attendance rows, etc.).
+-- To backup actual data, use Supabase Dashboard export or: supabase db dump
+--
+-- Use this file to:
+--   - Understand / recreate the OLD professor-based structure on a NEW empty project
+--   - Compare against the teacher schema after migration
+--
+-- Do NOT run this on your live project if it already has the teacher rename applied.
+-- =============================================================================
+
 -- Attendximity normalized schema (Supabase/PostgreSQL)
 -- Migration-first script with compatibility RPCs used by the Flutter app.
 -- Safe migration note:
@@ -45,7 +59,7 @@ create table if not exists public.admins (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.teachers (
+create table if not exists public.professors (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
   email text unique not null,
@@ -81,11 +95,11 @@ create table if not exists public.sections (
 create table if not exists public.subject_offerings (
   id uuid primary key default gen_random_uuid(),
   subject_id uuid not null references public.subjects(id) on delete restrict,
-  teacher_id uuid not null references public.teachers(id) on delete restrict,
+  professor_id uuid not null references public.professors(id) on delete restrict,
   section_id uuid not null references public.sections(id) on delete restrict,
   school_year text,
   semester text,
-  -- Beacon config set by admin; teacher session uses these (no manual entry on teacher device).
+  -- Beacon config set by admin; professor session uses these (no manual entry on prof device).
   beacon_uuid text,
   beacon_name text,
   is_active boolean not null default true,
@@ -148,13 +162,13 @@ create table if not exists public.attendance_records (
 -- ---------------------------------------------------------------------------
 -- Indexes
 -- ---------------------------------------------------------------------------
-create index if not exists idx_subject_offerings_teacher on public.subject_offerings(teacher_id);
+create index if not exists idx_subject_offerings_professor on public.subject_offerings(professor_id);
 create index if not exists idx_subject_offerings_subject on public.subject_offerings(subject_id);
 create index if not exists idx_subject_offerings_section on public.subject_offerings(section_id);
 create unique index if not exists uq_subject_offerings_dedup
   on public.subject_offerings(
     subject_id,
-    teacher_id,
+    professor_id,
     section_id,
     coalesce(school_year, ''),
     coalesce(semester, '')
@@ -183,14 +197,14 @@ begin
     where role = 'admin'
     on conflict (email) do nothing;
 
-    insert into public.teachers(full_name, email, password_hash, max_students)
+    insert into public.professors(full_name, email, password_hash, max_students)
     select
-      coalesce(nullif(trim(full_name), ''), 'Teacher'),
+      coalesce(nullif(trim(full_name), ''), 'Professor'),
       trim(username),
       password_hash,
       30
     from public.app_users_legacy
-    where role in ('professor', 'teacher')
+    where role = 'professor'
     on conflict (email) do nothing;
 
     insert into public.students(full_name, email, password_hash, student_number)
@@ -208,20 +222,6 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Functions used by app
 -- ---------------------------------------------------------------------------
--- PostgreSQL cannot CREATE OR REPLACE when parameter or return column names change
--- (e.g. p_professor_id → p_teacher_id). Drop old signatures first (idempotent).
-drop function if exists public.admin_create_subject_offering(text, text, text, text, text, text);
-drop function if exists public.get_subject_offerings_view(text);
-drop function if exists public.get_subject_offerings_view(text, text);
-drop function if exists public.get_admin_attendance_report(timestamptz, timestamptz, text, text, text);
-drop function if exists public.get_admin_attendance_report(timestamptz, timestamptz, text, text, text, text);
-drop function if exists public.get_admin_enrollments();
-drop function if exists public.get_student_dashboard(text);
-drop function if exists public.admin_create_professor_account(text, text, text, text, int);
-drop function if exists public.get_professor_session_history(text);
-drop function if exists public.get_professor_session_attendees(text, uuid);
-drop function if exists public.clear_professor_history(text);
-
 create or replace function public.app_login(
   p_username text,
   p_password text,
@@ -249,9 +249,9 @@ as $$
       or a.password_hash = w.p -- TODO: remove plain fallback before production
     )
   union all
-  select 'teacher'::text, p.id::text, p.full_name, p.email
-  from public.teachers p, wanted w
-  where w.r in ('teacher', 'professor')
+  select 'professor'::text, p.id::text, p.full_name, p.email
+  from public.professors p, wanted w
+  where w.r = 'professor'
     and lower(p.email) = w.u
     and (
       p.password_hash = extensions.crypt(w.p, p.password_hash)
@@ -306,8 +306,8 @@ begin
 end;
 $$;
 
-create or replace function public.admin_create_teacher_account(
-  p_teacher_id text,
+create or replace function public.admin_create_professor_account(
+  p_professor_id text,
   p_full_name text,
   p_username text,
   p_password text,
@@ -319,9 +319,9 @@ security definer
 set search_path = public
 as $$
 declare
-  v_teacher_id uuid;
+  v_professor_id uuid;
 begin
-  insert into public.teachers(full_name, email, password_hash, max_students)
+  insert into public.professors(full_name, email, password_hash, max_students)
   values (
     trim(p_full_name),
     trim(p_username),
@@ -331,14 +331,14 @@ begin
   on conflict (email) do update
     set full_name = excluded.full_name,
         max_students = excluded.max_students
-  returning id into v_teacher_id;
+  returning id into v_professor_id;
 
-  return v_teacher_id::text;
+  return v_professor_id::text;
 end;
 $$;
 
 create or replace function public.admin_create_subject_offering(
-  p_teacher_id text,
+  p_professor_id text,
   p_subject_code text,
   p_subject_title text,
   p_section text,
@@ -368,12 +368,12 @@ begin
   returning id into v_section_id;
 
   insert into public.subject_offerings(
-    subject_id, teacher_id, section_id, school_year, semester, is_active,
+    subject_id, professor_id, section_id, school_year, semester, is_active,
     beacon_uuid, beacon_name
   )
   values (
     v_subject_id,
-    trim(p_teacher_id)::uuid,
+    trim(p_professor_id)::uuid,
     v_section_id,
     null,
     null,
@@ -388,13 +388,13 @@ begin
     select id into v_offering_id
     from public.subject_offerings
     where subject_id = v_subject_id
-      and teacher_id = trim(p_teacher_id)::uuid
+      and professor_id = trim(p_professor_id)::uuid
       and section_id = v_section_id
     order by created_at desc
     limit 1;
   end if;
 
-  -- Persist admin-configured beacon (used by teacher app when starting a session).
+  -- Persist admin-configured beacon (used by professor app when starting a session).
   update public.subject_offerings
   set
     beacon_uuid = nullif(trim(p_beacon_uuid), ''),
@@ -406,7 +406,7 @@ end;
 $$;
 
 create or replace function public.get_subject_offerings_view(
-  p_teacher_id text default null
+  p_professor_id text default null
 )
 returns table(
   id uuid,
@@ -415,8 +415,8 @@ returns table(
   subject_code text,
   subject_title text,
   section text,
-  teacher_id uuid,
-  teacher_name text,
+  professor_id uuid,
+  professor_name text,
   beacon_uuid text,
   beacon_name text
 )
@@ -431,16 +431,16 @@ as $$
     sub.subject_code,
     sub.subject_title,
     sec.section_name as section,
-    so.teacher_id,
-    p.full_name as teacher_name,
+    so.professor_id,
+    p.full_name as professor_name,
     so.beacon_uuid,
     so.beacon_name
   from public.subject_offerings so
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
-  join public.teachers p on p.id = so.teacher_id
+  join public.professors p on p.id = so.professor_id
   where so.is_active = true
-    and (p_teacher_id is null or so.teacher_id = trim(p_teacher_id)::uuid)
+    and (p_professor_id is null or so.professor_id = trim(p_professor_id)::uuid)
   order by sub.subject_code, sec.section_name;
 $$;
 
@@ -454,8 +454,8 @@ returns table (
   subject_code text,
   subject_title text,
   section text,
-  teacher_id uuid,
-  teacher_name text,
+  professor_id uuid,
+  professor_name text,
   beacon_uuid text,
   beacon_name text
 )
@@ -470,7 +470,7 @@ as $$
     sub.subject_code,
     sub.subject_title,
     sec.section_name,
-    so.teacher_id,
+    so.professor_id,
     p.full_name,
     so.beacon_uuid,
     so.beacon_name
@@ -478,7 +478,7 @@ as $$
   join public.subject_offerings so on so.id = sse.subject_offering_id
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
-  join public.teachers p on p.id = so.teacher_id
+  join public.professors p on p.id = so.professor_id
   where sse.student_id = trim(p_student_id)::uuid
     and so.is_active = true
   order by sub.subject_code, sec.section_name;
@@ -505,8 +505,8 @@ returns table (
   student_id uuid,
   student_name text,
   offering_id uuid,
-  teacher_id uuid,
-  teacher_name text,
+  professor_id uuid,
+  professor_name text,
   subject_code text,
   subject_title text,
   section text
@@ -519,15 +519,15 @@ as $$
     s.id as student_id,
     s.full_name as student_name,
     so.id as offering_id,
-    p.id as teacher_id,
-    p.full_name as teacher_name,
+    p.id as professor_id,
+    p.full_name as professor_name,
     sub.subject_code,
     sub.subject_title,
     sec.section_name as section
   from public.student_subject_enrollments sse
   join public.students s on s.id = sse.student_id
   join public.subject_offerings so on so.id = sse.subject_offering_id
-  join public.teachers p on p.id = so.teacher_id
+  join public.professors p on p.id = so.professor_id
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
   order by s.full_name, sub.subject_code, sec.section_name;
@@ -536,7 +536,7 @@ $$;
 create or replace function public.get_admin_attendance_report(
   p_from timestamptz default null,
   p_to timestamptz default null,
-  p_teacher_id text default null,
+  p_professor_id text default null,
   p_subject_code text default null,
   p_section_name text default null
 )
@@ -547,8 +547,8 @@ returns table(
   subject_code text,
   subject_title text,
   section text,
-  teacher_id uuid,
-  teacher_name text,
+  professor_id uuid,
+  professor_name text,
   student_id uuid,
   student_name text,
   marked_at timestamptz,
@@ -582,11 +582,11 @@ as $$
   join public.subject_offerings so on so.id = sess.subject_offering_id
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
-  join public.teachers p on p.id = so.teacher_id
+  join public.professors p on p.id = so.professor_id
   join public.students st on st.id = ar.student_id
   where (p_from is null or ar.marked_at >= p_from)
     and (p_to is null or ar.marked_at <= p_to)
-    and (p_teacher_id is null or so.teacher_id = trim(p_teacher_id)::uuid)
+    and (p_professor_id is null or so.professor_id = trim(p_professor_id)::uuid)
     and (p_subject_code is null or sub.subject_code = p_subject_code)
     and (p_section_name is null or sec.section_name = p_section_name)
   order by ar.marked_at desc;
@@ -607,8 +607,8 @@ begin
     update public.students
     set full_name = trim(p_full_name)
     where id = trim(p_linked_id)::uuid;
-  elsif trim(p_role) in ('teacher', 'professor') then
-    update public.teachers
+  elsif trim(p_role) = 'professor' then
+    update public.professors
     set full_name = trim(p_full_name)
     where id = trim(p_linked_id)::uuid;
   elsif trim(p_role) = 'admin' then
@@ -621,8 +621,8 @@ begin
 end;
 $$;
 
-create or replace function public.get_teacher_session_history(
-  p_teacher_id text
+create or replace function public.get_professor_session_history(
+  p_professor_id text
 )
 returns table (
   session_id uuid,
@@ -649,15 +649,15 @@ as $$
   join public.subject_offerings so on so.id = sess.subject_offering_id
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
-  where so.teacher_id = trim(p_teacher_id)::uuid
+  where so.professor_id = trim(p_professor_id)::uuid
   order by sess.started_at desc;
 $$;
 
 -- OUT/return columns changed vs older DBs; Postgres forbids CREATE OR REPLACE for that.
-drop function if exists public.get_teacher_session_attendees(text, uuid);
+drop function if exists public.get_professor_session_attendees(text, uuid);
 
-create or replace function public.get_teacher_session_attendees(
-  p_teacher_id text,
+create or replace function public.get_professor_session_attendees(
+  p_professor_id text,
   p_session_id uuid
 )
 returns table (
@@ -694,7 +694,7 @@ as $$
     on ar.attendance_session_id = sess.id
     and ar.student_id = st.id
   where sess.id = p_session_id
-    and so.teacher_id = trim(p_teacher_id)::uuid
+    and so.professor_id = trim(p_professor_id)::uuid
   order by st.full_name asc;
 $$;
 
@@ -737,7 +737,7 @@ returns table (
   subject_code text,
   subject_title text,
   section text,
-  teacher_name text,
+  professor_name text,
   session_started_at timestamptz,
   marked_at timestamptz
 )
@@ -757,13 +757,13 @@ as $$
   join public.subject_offerings so on so.id = sess.subject_offering_id
   join public.subjects sub on sub.id = so.subject_id
   join public.sections sec on sec.id = so.section_id
-  join public.teachers p on p.id = so.teacher_id
+  join public.professors p on p.id = so.professor_id
   where ar.student_id = trim(p_student_id)::uuid
   order by ar.marked_at desc;
 $$;
 
-create or replace function public.clear_teacher_history(
-  p_teacher_id text
+create or replace function public.clear_professor_history(
+  p_professor_id text
 )
 returns void
 language plpgsql
@@ -776,12 +776,12 @@ begin
   using public.attendance_sessions sess, public.subject_offerings so
   where ar.attendance_session_id = sess.id
     and sess.subject_offering_id = so.id
-    and so.teacher_id = trim(p_teacher_id)::uuid;
+    and so.professor_id = trim(p_professor_id)::uuid;
 
   delete from public.attendance_sessions sess
   using public.subject_offerings so
   where sess.subject_offering_id = so.id
-    and so.teacher_id = trim(p_teacher_id)::uuid;
+    and so.professor_id = trim(p_professor_id)::uuid;
 end;
 $$;
 
@@ -805,7 +805,7 @@ $$;
 -- ---------------------------------------------------------------------------
 grant execute on function public.app_login(text, text, text) to anon, authenticated;
 grant execute on function public.register_student(text, text, text, text, text, text) to anon, authenticated;
-grant execute on function public.admin_create_teacher_account(text, text, text, text, int) to anon, authenticated;
+grant execute on function public.admin_create_professor_account(text, text, text, text, int) to anon, authenticated;
 grant execute on function public.admin_create_subject_offering(text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.get_subject_offerings_view(text) to anon, authenticated;
 grant execute on function public.admin_assign_student_to_offering(text, uuid) to anon, authenticated;
@@ -813,18 +813,18 @@ grant execute on function public.get_admin_enrollments() to anon, authenticated;
 grant execute on function public.get_student_dashboard(text) to anon, authenticated;
 grant execute on function public.get_admin_attendance_report(timestamptz, timestamptz, text, text, text) to anon, authenticated;
 grant execute on function public.update_display_name(text, text, text) to anon, authenticated;
-grant execute on function public.get_teacher_session_history(text) to anon, authenticated;
-grant execute on function public.get_teacher_session_attendees(text, uuid) to anon, authenticated;
+grant execute on function public.get_professor_session_history(text) to anon, authenticated;
+grant execute on function public.get_professor_session_attendees(text, uuid) to anon, authenticated;
 grant execute on function public.get_session_device_anomalies(uuid) to anon, authenticated;
 grant execute on function public.get_student_attendance_history(text) to anon, authenticated;
-grant execute on function public.clear_teacher_history(text) to anon, authenticated;
+grant execute on function public.clear_professor_history(text) to anon, authenticated;
 grant execute on function public.clear_student_history(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RLS
 -- ---------------------------------------------------------------------------
 alter table public.admins enable row level security;
-alter table public.teachers enable row level security;
+alter table public.professors enable row level security;
 alter table public.students enable row level security;
 alter table public.subjects enable row level security;
 alter table public.sections enable row level security;
@@ -836,8 +836,8 @@ alter table public.attendance_records enable row level security;
 
 drop policy if exists "open admins read" on public.admins;
 create policy "open admins read" on public.admins for select to anon using (true);
-drop policy if exists "open teachers read" on public.teachers;
-create policy "open teachers read" on public.teachers for select to anon using (true);
+drop policy if exists "open professors read" on public.professors;
+create policy "open professors read" on public.professors for select to anon using (true);
 drop policy if exists "open students read" on public.students;
 create policy "open students read" on public.students for select to anon using (true);
 drop policy if exists "open subjects rw" on public.subjects;

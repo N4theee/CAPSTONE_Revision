@@ -52,7 +52,7 @@ class StudentAttendanceDetailScreen extends StatelessWidget {
                     _CourseHeaderCard(
                       title: '${item.subjectCode} - ${item.subjectTitle}',
                       sectionLine: 'Section ${item.section}',
-                      professorLine: item.professorName,
+                      teacherLine: item.teacherName,
                       narrow: narrow,
                     ),
                     const SizedBox(height: 14),
@@ -162,7 +162,7 @@ class StudentAttendanceDetailScreen extends StatelessWidget {
           backgroundColor: StudentAttendanceUi.surfaceElevated,
           title: const Text('How it works'),
           content: const Text(
-            'Your phone listens for the professor’s Bluetooth beacon. '
+            'Your phone listens for the teacher’s Bluetooth beacon. '
             'Keep Bluetooth and Location on and stay within range to mark attendance.',
           ),
           actions: [
@@ -181,13 +181,13 @@ class _CourseHeaderCard extends StatelessWidget {
   const _CourseHeaderCard({
     required this.title,
     required this.sectionLine,
-    required this.professorLine,
+    required this.teacherLine,
     required this.narrow,
   });
 
   final String title;
   final String sectionLine;
-  final String professorLine;
+  final String teacherLine;
   final bool narrow;
 
   @override
@@ -244,7 +244,7 @@ class _CourseHeaderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    professorLine,
+                    teacherLine,
                     style: const TextStyle(
                       color: StudentAttendanceUi.textSecondary,
                       fontSize: 13,
@@ -399,7 +399,7 @@ class _HowItWorksCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your phone listens for the professor’s Bluetooth beacon. '
+                      'Your phone listens for the teacher’s Bluetooth beacon. '
                       'Stay in range with Bluetooth on to verify attendance.',
                       style: TextStyle(
                         color: StudentAttendanceUi.textSecondary,

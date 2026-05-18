@@ -115,20 +115,20 @@ class _StudentScreenState extends State<StudentScreen>
 
   Future<void> _checkSession() async {
     try {
-      final sessionForProfessor =
+      final sessionForTeacher =
           await _db.getActiveSessionForOffering(widget.offering.id);
 
-      if (sessionForProfessor != null) {
-        final newId = sessionForProfessor['id'] as String;
-        final dynamic beaconRaw = sessionForProfessor['beacon_uuid'] ??
-            sessionForProfessor['beacon_name'];
+      if (sessionForTeacher != null) {
+        final newId = sessionForTeacher['id'] as String;
+        final dynamic beaconRaw = sessionForTeacher['beacon_uuid'] ??
+            sessionForTeacher['beacon_name'];
         if (beaconRaw == null) {
           throw Exception('Session is missing beacon identifier');
         }
-        final dynamic beaconNameRaw = sessionForProfessor['beacon_name'];
+        final dynamic beaconNameRaw = sessionForTeacher['beacon_name'];
         final newBeaconUuid = beaconRaw.toString();
         final newBeaconName = beaconNameRaw?.toString();
-        final rssiRaw = sessionForProfessor['rssi_threshold'];
+        final rssiRaw = sessionForTeacher['rssi_threshold'];
         final int parsedRssi;
         if (rssiRaw is int) {
           parsedRssi = rssiRaw;
@@ -136,7 +136,7 @@ class _StudentScreenState extends State<StudentScreen>
           parsedRssi =
               int.tryParse(rssiRaw?.toString() ?? '') ?? AppConfig.rssiThreshold;
         }
-        final startedStr = sessionForProfessor['started_at'] as String?;
+        final startedStr = sessionForTeacher['started_at'] as String?;
         final started = startedStr != null
             ? parseDbTimestamptzToLocal(startedStr)
             : null;
@@ -144,7 +144,7 @@ class _StudentScreenState extends State<StudentScreen>
         if (_sessionId != newId) {
           setState(() {
             _sessionId = newId;
-            _subject = sessionForProfessor['subject'] as String?;
+            _subject = sessionForTeacher['subject'] as String?;
             _beaconUuid = newBeaconUuid;
             _beaconAdvertisedName = newBeaconName;
             _sessionRssiThreshold = parsedRssi;
@@ -262,7 +262,7 @@ class _StudentScreenState extends State<StudentScreen>
           backgroundColor: StudentAttendanceUi.surfaceElevated,
           title: const Text('How it works'),
           content: const Text(
-            'Your phone listens for the professor’s Bluetooth beacon. '
+            'Your phone listens for the teacher’s Bluetooth beacon. '
             'Keep Bluetooth and Location on and stay within range to mark attendance.',
           ),
           actions: [
@@ -442,7 +442,7 @@ class _StudentScreenState extends State<StudentScreen>
                     inRange: _inRange,
                     courseTitle: courseTitle,
                     section: widget.offering.section,
-                    professorName: widget.offering.professorName,
+                    teacherName: widget.offering.teacherName,
                     subjectFallback: _subject ?? 'No active session',
                     elapsed: _elapsedLabel(),
                     purple: teal,
@@ -465,7 +465,7 @@ class _StudentScreenState extends State<StudentScreen>
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'Stay near the professor to stay in range. Bluetooth must be ON.',
+                    'Stay near the teacher to stay in range. Bluetooth must be ON.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -480,7 +480,7 @@ class _StudentScreenState extends State<StudentScreen>
                         ? (_inRange
                             ? 'You are within range of the class beacon.'
                             : 'Move closer until you are in range.')
-                        : 'Waiting for your professor to start a session.',
+                        : 'Waiting for your teacher to start a session.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
@@ -639,7 +639,7 @@ class _SessionHowItWorksInline extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Your phone listens for the professor’s Bluetooth beacon. '
+                      'Your phone listens for the teacher’s Bluetooth beacon. '
                       'Keep Bluetooth and Location on and stay within range.',
                       style: TextStyle(
                         color: StudentAttendanceUi.textSecondary,
@@ -665,7 +665,7 @@ class _SessionHeroCard extends StatelessWidget {
     required this.inRange,
     required this.courseTitle,
     required this.section,
-    required this.professorName,
+    required this.teacherName,
     required this.subjectFallback,
     required this.elapsed,
     required this.purple,
@@ -678,7 +678,7 @@ class _SessionHeroCard extends StatelessWidget {
   final bool inRange;
   final String courseTitle;
   final String section;
-  final String professorName;
+  final String teacherName;
   final String subjectFallback;
   final String elapsed;
   final Color purple;
@@ -793,7 +793,7 @@ class _SessionHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Prof. $professorName',
+                      'Teacher $teacherName',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.65),
                         fontSize: 13,
@@ -895,7 +895,7 @@ class _ProximityBanner extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Stay near the professor to stay in range',
+                'Stay near the teacher to stay in range',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,

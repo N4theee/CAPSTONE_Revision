@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
-import '../ui/professor_attendance_ui.dart';
+import '../ui/teacher_attendance_ui.dart';
 import '../ui/responsive.dart';
 
-class ProfessorSessionDetailScreen extends StatefulWidget {
-  const ProfessorSessionDetailScreen({
+class TeacherSessionDetailScreen extends StatefulWidget {
+  const TeacherSessionDetailScreen({
     super.key,
-    required this.professorId,
+    required this.teacherId,
     required this.session,
   });
 
-  final String professorId;
-  final ProfessorSessionHistoryItem session;
+  final String teacherId;
+  final TeacherSessionHistoryItem session;
 
   @override
-  State<ProfessorSessionDetailScreen> createState() =>
-      _ProfessorSessionDetailScreenState();
+  State<TeacherSessionDetailScreen> createState() =>
+      _TeacherSessionDetailScreenState();
 }
 
-class _ProfessorSessionDetailScreenState
-    extends State<ProfessorSessionDetailScreen> {
+class _TeacherSessionDetailScreenState
+    extends State<TeacherSessionDetailScreen> {
   final _db = SupabaseService();
   late Future<Map<String, dynamic>> _detailsFuture;
   String? _updatingStudentId;
@@ -39,8 +39,8 @@ class _ProfessorSessionDetailScreenState
 
   Future<Map<String, dynamic>> _load() async {
     final sessionId = widget.session.sessionId;
-    final attendeesFuture = _db.getSessionAttendeesForProfessor(
-      professorId: widget.professorId,
+    final attendeesFuture = _db.getSessionAttendeesForTeacher(
+      teacherId: widget.teacherId,
       sessionId: sessionId,
     );
     final anomaliesFuture = _db.getSessionDeviceAnomalies(sessionId);
@@ -61,8 +61,8 @@ class _ProfessorSessionDetailScreenState
     if (_updatingStudentId != null) return;
     setState(() => _updatingStudentId = detail.studentId);
     try {
-      await _db.setProfessorSessionAttendance(
-        professorId: widget.professorId,
+      await _db.setTeacherSessionAttendance(
+        teacherId: widget.teacherId,
         sessionId: widget.session.sessionId,
         studentId: detail.studentId,
         isPresent: isPresent,
@@ -92,7 +92,7 @@ class _ProfessorSessionDetailScreenState
     final busy = _updatingStudentId == detail.studentId;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: ProfessorAttendanceUi.surface,
+      backgroundColor: TeacherAttendanceUi.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -109,7 +109,7 @@ class _ProfessorSessionDetailScreenState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: ProfessorAttendanceUi.textSecondary
+                      color: TeacherAttendanceUi.textSecondary
                           .withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -128,7 +128,7 @@ class _ProfessorSessionDetailScreenState
                 Text(
                   'Update attendance for this session',
                   style: TextStyle(
-                    color: ProfessorAttendanceUi.textSecondary
+                    color: TeacherAttendanceUi.textSecondary
                         .withValues(alpha: 0.95),
                     fontSize: 13,
                   ),
@@ -147,7 +147,7 @@ class _ProfessorSessionDetailScreenState
                     icon: const Icon(Icons.check_circle_outline_rounded),
                     label: const Text('Mark as Present'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: ProfessorAttendanceUi.presentGreen,
+                      backgroundColor: TeacherAttendanceUi.presentGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -163,9 +163,9 @@ class _ProfessorSessionDetailScreenState
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('Mark as Absent'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: ProfessorAttendanceUi.absentOrange,
+                      foregroundColor: TeacherAttendanceUi.absentOrange,
                       side: const BorderSide(
-                        color: ProfessorAttendanceUi.absentOrange,
+                        color: TeacherAttendanceUi.absentOrange,
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -234,7 +234,7 @@ class _ProfessorSessionDetailScreenState
                 child: const Text(
                   'No enrolled students for this class section.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: ProfessorAttendanceUi.textSecondary),
+                  style: TextStyle(color: TeacherAttendanceUi.textSecondary),
                 ),
               ),
             );
@@ -266,7 +266,7 @@ class _ProfessorSessionDetailScreenState
                         Text(
                           'Enrolled students — tap Edit to mark Present or Absent',
                           style: TextStyle(
-                            color: ProfessorAttendanceUi.textSecondary
+                            color: TeacherAttendanceUi.textSecondary
                                 .withValues(alpha: 0.95),
                             fontSize: 13,
                             height: 1.35,
@@ -340,10 +340,10 @@ class _AnomalyBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: ProfessorAttendanceUi.anomalyRed.withValues(alpha: 0.12),
+        color: TeacherAttendanceUi.anomalyRed.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: ProfessorAttendanceUi.anomalyRed.withValues(alpha: 0.85),
+          color: TeacherAttendanceUi.anomalyRed.withValues(alpha: 0.85),
           width: 1.5,
         ),
       ),
@@ -355,7 +355,7 @@ class _AnomalyBanner extends StatelessWidget {
             children: [
               Icon(
                 Icons.error_outline_rounded,
-                color: ProfessorAttendanceUi.anomalyRed,
+                color: TeacherAttendanceUi.anomalyRed,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -366,7 +366,7 @@ class _AnomalyBanner extends StatelessWidget {
                     const Text(
                       'Anomaly detected',
                       style: TextStyle(
-                        color: ProfessorAttendanceUi.anomalyRed,
+                        color: TeacherAttendanceUi.anomalyRed,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -375,7 +375,7 @@ class _AnomalyBanner extends StatelessWidget {
                     Text(
                       'One device is being used by more than one student to mark attendance in this session.',
                       style: TextStyle(
-                        color: ProfessorAttendanceUi.anomalyRed
+                        color: TeacherAttendanceUi.anomalyRed
                             .withValues(alpha: 0.92),
                         fontSize: 13,
                         height: 1.4,
@@ -390,7 +390,7 @@ class _AnomalyBanner extends StatelessWidget {
           Text(
             'Shared device',
             style: TextStyle(
-              color: ProfessorAttendanceUi.anomalyRed.withValues(alpha: 0.95),
+              color: TeacherAttendanceUi.anomalyRed.withValues(alpha: 0.95),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -405,7 +405,7 @@ class _AnomalyBanner extends StatelessWidget {
                   Text(
                     a.deviceLabel,
                     style: TextStyle(
-                      color: ProfessorAttendanceUi.anomalyRed
+                      color: TeacherAttendanceUi.anomalyRed
                           .withValues(alpha: 0.88),
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -423,17 +423,17 @@ class _AnomalyBanner extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: ProfessorAttendanceUi.surface,
+                              color: TeacherAttendanceUi.surface,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: ProfessorAttendanceUi.anomalyRed
+                                color: TeacherAttendanceUi.anomalyRed
                                     .withValues(alpha: 0.55),
                               ),
                             ),
                             child: Text(
                               s,
                               style: const TextStyle(
-                                color: ProfessorAttendanceUi.anomalyRed,
+                                color: TeacherAttendanceUi.anomalyRed,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -475,23 +475,23 @@ class _AttendanceTile extends StatelessWidget {
         : '—';
 
     final avatarBg = detail.isPresent
-        ? ProfessorAttendanceUi.presentGreen.withValues(alpha: 0.22)
-        : ProfessorAttendanceUi.absentOrange.withValues(alpha: 0.22);
+        ? TeacherAttendanceUi.presentGreen.withValues(alpha: 0.22)
+        : TeacherAttendanceUi.absentOrange.withValues(alpha: 0.22);
     final avatarFg = detail.isPresent
-        ? ProfessorAttendanceUi.presentGreen
-        : ProfessorAttendanceUi.absentOrange;
+        ? TeacherAttendanceUi.presentGreen
+        : TeacherAttendanceUi.absentOrange;
 
     final badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: detail.isPresent
-            ? ProfessorAttendanceUi.presentGreen.withValues(alpha: 0.2)
-            : ProfessorAttendanceUi.absentOrange.withValues(alpha: 0.2),
+            ? TeacherAttendanceUi.presentGreen.withValues(alpha: 0.2)
+            : TeacherAttendanceUi.absentOrange.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: detail.isPresent
-              ? ProfessorAttendanceUi.presentGreen
-              : ProfessorAttendanceUi.absentOrange,
+              ? TeacherAttendanceUi.presentGreen
+              : TeacherAttendanceUi.absentOrange,
           width: 1,
         ),
       ),
@@ -499,8 +499,8 @@ class _AttendanceTile extends StatelessWidget {
         detail.isPresent ? 'Present' : 'Absent',
         style: TextStyle(
           color: detail.isPresent
-              ? ProfessorAttendanceUi.presentGreen
-              : ProfessorAttendanceUi.absentOrange,
+              ? TeacherAttendanceUi.presentGreen
+              : TeacherAttendanceUi.absentOrange,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -524,7 +524,7 @@ class _AttendanceTile extends StatelessWidget {
             tooltip: 'Edit attendance',
             onPressed: onEdit,
             icon: const Icon(Icons.edit_outlined),
-            color: ProfessorAttendanceUi.textSecondary,
+            color: TeacherAttendanceUi.textSecondary,
             visualDensity: VisualDensity.compact,
           );
 
@@ -546,7 +546,7 @@ class _AttendanceTile extends StatelessWidget {
           Text(
             subtitle,
             style: const TextStyle(
-              color: ProfessorAttendanceUi.textSecondary,
+              color: TeacherAttendanceUi.textSecondary,
               fontSize: 12,
               height: 1.3,
             ),
@@ -557,7 +557,7 @@ class _AttendanceTile extends StatelessWidget {
           Text(
             timeStr,
             style: const TextStyle(
-              color: ProfessorAttendanceUi.textSecondary,
+              color: TeacherAttendanceUi.textSecondary,
               fontSize: 12,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
@@ -567,7 +567,7 @@ class _AttendanceTile extends StatelessWidget {
     );
 
     return Material(
-      color: ProfessorAttendanceUi.surface,
+      color: TeacherAttendanceUi.surface,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
         padding: EdgeInsets.symmetric(

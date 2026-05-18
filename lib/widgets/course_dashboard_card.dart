@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Two-tone course tile used on professor and student dashboards (same layout, different palettes).
+/// Two-tone course tile used on teacher and student dashboards (same layout, different palettes).
 class CourseDashboardCard extends StatelessWidget {
   const CourseDashboardCard({
     super.key,

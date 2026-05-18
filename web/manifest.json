@@ -1,6 +1,6 @@
 {
-    "name": "ble_attendance",
-    "short_name": "ble_attendance",
+    "name": "Attendximity",
+    "short_name": "Attendximity",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

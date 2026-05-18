@@ -10,7 +10,7 @@ import '../services/local_session_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/landing_auth_ui.dart';
 import '../ui/responsive.dart';
-import 'professor_dashboard_screen.dart';
+import 'teacher_dashboard_screen.dart';
 import 'student_dashboard_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -60,7 +60,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _loadRemembered() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedRole = prefs.getString(_rememberRoleKey);
+    var savedRole = prefs.getString(_rememberRoleKey);
+    if (savedRole == 'professor') savedRole = 'teacher';
     if (savedRole != _role) return;
     if (!mounted) return;
     setState(() {
@@ -152,7 +153,7 @@ class _AuthScreenState extends State<AuthScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ProfessorDashboardScreen(user: user),
+            builder: (_) => TeacherDashboardScreen(user: user),
           ),
         );
       }
@@ -170,7 +171,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   String get _screenTitle {
-    if (_role == 'professor') return 'Teacher Login';
+    if (_role == 'teacher') return 'Teacher Login';
     return _isRegister ? 'Student Register' : 'Student Login';
   }
 
@@ -222,7 +223,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 onChanged: (r) {
                                   setState(() {
                                     _role = r;
-                                    if (_role == 'professor') {
+                                    if (_role == 'teacher') {
                                       _isRegister = false;
                                     }
                                   });
@@ -380,7 +381,7 @@ class _RoleSegmentBar extends StatelessWidget {
           child: _SegmentChip(
             label: 'Teacher',
             selected: !isStudent,
-            onTap: () => onChanged('professor'),
+            onTap: () => onChanged('teacher'),
           ),
         ),
       ],

@@ -8,21 +8,21 @@ import '../services/supabase_service.dart';
 import '../ui/responsive.dart';
 import '../util/db_timestamptz.dart';
 
-class ProfessorScreen extends StatefulWidget {
-  const ProfessorScreen({
+class TeacherScreen extends StatefulWidget {
+  const TeacherScreen({
     super.key,
-    required this.professorName,
+    required this.teacherName,
     required this.offering,
   });
 
-  final String professorName;
+  final String teacherName;
   final SubjectOffering offering;
 
   @override
-  State<ProfessorScreen> createState() => _ProfessorScreenState();
+  State<TeacherScreen> createState() => _TeacherScreenState();
 }
 
-class _ProfessorScreenState extends State<ProfessorScreen>
+class _TeacherScreenState extends State<TeacherScreen>
     with TickerProviderStateMixin {
   final _db = SupabaseService();
   final _ble = BleService();
@@ -54,7 +54,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
   Future<void> _startSession() async {
     setState(() => _loading = true);
     try {
-      // Beacon UUID/name and RSSI come from the admin-configured offering (not typed by professor).
+      // Beacon UUID/name and RSSI come from the admin-configured offering (not typed by teacher).
       const sessionRssi = -100;
       final uuid = widget.offering.beaconUuid.trim();
       final advertisedName = _effectiveAdvertisedBeaconName();
@@ -76,13 +76,13 @@ class _ProfessorScreenState extends State<ProfessorScreen>
         throw Exception('Please turn on Bluetooth first');
       }
 
-      await _ble.startProfessorBeacon(
+      await _ble.startTeacherBeacon(
         beaconUuid: uuid,
         localName: advertisedName,
       );
 
       final session = await _db.startSession(
-        professorId: widget.offering.professorId,
+        teacherId: widget.offering.teacherId,
         offeringId: widget.offering.id,
         subject: widget.offering.label,
         beaconUuid: uuid,
@@ -108,7 +108,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
     _pollTimer?.cancel();
     try {
       await _db.endSession(_sessionId!);
-      await _ble.stopProfessorBeacon();
+      await _ble.stopTeacherBeacon();
       setState(() {
         _active = false;
         _loading = false;
@@ -197,7 +197,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
   void dispose() {
     _pollTimer?.cancel();
     _radarController.dispose();
-    _ble.stopProfessorBeacon();
+    _ble.stopTeacherBeacon();
     super.dispose();
   }
 
@@ -206,7 +206,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
     final courseTitle =
         '${widget.offering.subjectCode} - ${widget.offering.subjectTitle}';
     final subline =
-        '${widget.professorName} • Section ${widget.offering.section}';
+        '${widget.teacherName} • Section ${widget.offering.section}';
     final hPad = AppBreakpoints.horizontalPadding(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final radarH = AppBreakpoints.sessionRadarHeight(context);
@@ -218,7 +218,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Professor Session',
+          'Teacher Session',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
         actions: [
@@ -357,7 +357,7 @@ class _ProfessorScreenState extends State<ProfessorScreen>
               ),
             ),
             const SizedBox(height: 16),
-            _ProfessorRadar(
+            _TeacherRadar(
               height: radarH,
               animation: _radarController,
               active: _active,
@@ -664,8 +664,8 @@ class _StatMiniCard extends StatelessWidget {
   }
 }
 
-class _ProfessorRadar extends StatelessWidget {
-  const _ProfessorRadar({
+class _TeacherRadar extends StatelessWidget {
+  const _TeacherRadar({
     required this.height,
     required this.animation,
     required this.active,

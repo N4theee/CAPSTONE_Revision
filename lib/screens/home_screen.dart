@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.school_rounded,
                             title: 'I am a Teacher',
                             subtitle: 'Login and start attendance sessions',
-                            onTap: () => _openAuth(role: 'professor'),
+                            onTap: () => _openAuth(role: 'teacher'),
                           ),
                           const SizedBox(height: 14),
                           _GradientBorderRoleCard(
@@ -105,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               icon: Icons.admin_panel_settings_rounded,
                               title: 'Admin Panel (Web)',
-                              subtitle: 'Create professor accounts',
+                              subtitle: 'Create teacher accounts',
                               onTap: _openAdminLogin,
                             ),
                           ],

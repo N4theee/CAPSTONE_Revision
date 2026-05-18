@@ -1,7 +1,7 @@
 class AppConfig {
   // ── Supabase ──────────────────────────────────────────────
-  static const String supabaseUrl = 'https://ofqbwxdytpjljzbzjlxb.supabase.co';      // paste from Step 4
-  static const String supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9mcWJ3eGR5dHBqbGp6YnpqbHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMDMwMTUsImV4cCI6MjA5MTU3OTAxNX0.1dQb48CxK822rBR8SVvklShGjqrtkSaE-SZ0_fGVcd0';       // paste from Step 4
+  static const String supabaseUrl = 'https://kllzpucxqzhewzoqydmi.supabase.co';
+  static const String supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsbHpwdWN4cXpoZXd6b3F5ZG1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMjA4MTIsImV4cCI6MjA5NDY5NjgxMn0.GpnsZizFMR0nepzXJ3E1POIZT_RhAymb_fAq46Y9nic';       // paste from Step 4
   
 
   // RSSI threshold for proximity
@@ -12,7 +12,7 @@ class AppConfig {
   static const int rssiThreshold      = -100;
   static const int scanRestartSeconds = 8;
 
-  // BLE service UUID used as professor beacon identifier.
+  // BLE service UUID used as teacher beacon identifier.
   static const String defaultBeaconUuid =
       '12345678-1234-1234-1234-123456789012';
   static const String defaultBeaconName = 'PROFATTN';

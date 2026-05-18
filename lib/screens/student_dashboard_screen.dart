@@ -128,7 +128,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Prof. ${latest.professorName}',
+                        'Teacher ${latest.teacherName}',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -171,7 +171,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
               return ListTile(
                 leading: const Icon(Icons.campaign_outlined),
                 title: Text('${n.subjectCode} - ${n.subjectTitle}'),
-                subtitle: Text('Section ${n.section} • ${n.professorName}'),
+                subtitle: Text('Section ${n.section} • ${n.teacherName}'),
                 trailing: Text('$hh:$mm'),
               );
             },
@@ -286,7 +286,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: const Text(
-              'Attendximitty',
+              'Attendximity',
               maxLines: 1,
               style: TextStyle(
                 color: Colors.white,

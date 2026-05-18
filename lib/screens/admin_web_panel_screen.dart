@@ -27,19 +27,19 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   bool _loadingLists = true;
   bool _loadingReport = false;
   List<StudentBasic> _students = [];
-  List<ProfessorBasic> _professors = [];
+  List<TeacherBasic> _teachers = [];
   List<SubjectOffering> _offerings = [];
   List<EnrollmentRecord> _enrollments = [];
   List<AdminAttendanceReportItem> _reportRows = [];
   DateTimeRange? _reportRange;
-  String? _reportProfessorId;
+  String? _reportTeacherId;
   String? _reportSubjectCode;
   String? _reportSection;
-  String? _selectedOfferingProfessorId;
+  String? _selectedOfferingTeacherId;
   String? _selectedBeaconUuid;
   List<String> _beaconUuidOptions = [];
   String? _selectedStudentId;
-  String? _selectedProfessorId;
+  String? _selectedTeacherId;
   String? _selectedSubjectCode;
   String? _selectedSection;
   String? _selectedOfferingId;
@@ -77,11 +77,11 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     super.dispose();
   }
 
-  Future<void> _createProfessor() async {
+  Future<void> _createTeacher() async {
     setState(() => _loading = true);
     try {
-      await _db.createProfessorByAdmin(
-        professorId: '',
+      await _db.createTeacherByAdmin(
+        teacherId: '',
         fullName: _nameCtrl.text,
         username: _userCtrl.text,
         password: _passCtrl.text,
@@ -89,7 +89,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Professor created successfully.')),
+        const SnackBar(content: Text('Teacher created successfully.')),
       );
       await _loadLists();
     } catch (e) {
@@ -105,14 +105,14 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   Future<void> _createOffering() async {
     setState(() => _creatingOffering = true);
     try {
-      if (_selectedOfferingProfessorId == null) {
-        throw Exception('Please select a professor.');
+      if (_selectedOfferingTeacherId == null) {
+        throw Exception('Please select a teacher.');
       }
       if (_selectedBeaconUuid == null || _selectedBeaconUuid!.isEmpty) {
         throw Exception('Please select a beacon UUID.');
       }
       await _db.createSubjectOfferingByAdmin(
-        professorId: _selectedOfferingProfessorId!,
+        teacherId: _selectedOfferingTeacherId!,
         subjectCode: _subjectCodeCtrl.text,
         subjectTitle: _subjectTitleCtrl.text,
         section: _sectionCtrl.text,
@@ -152,17 +152,17 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     setState(() => _loadingLists = true);
     try {
       final students = await _db.getAllStudents();
-      final professors = await _db.getAllProfessors();
+      final teachersList = await _db.getAllTeachers();
       final offerings = await _db.getAllOfferings();
       final enrollments = await _db.getAdminEnrollments();
       if (!mounted) return;
-      final selectedProfessorId = professors.any((p) => p.id == _selectedProfessorId)
-          ? _selectedProfessorId
-          : (professors.isNotEmpty ? professors.first.id : null);
-      final offeringsByProfessor = selectedProfessorId == null
+      final selectedTeacherId = teachersList.any((p) => p.id == _selectedTeacherId)
+          ? _selectedTeacherId
+          : (teachersList.isNotEmpty ? teachersList.first.id : null);
+      final offeringsByTeacher = selectedTeacherId == null
           ? <SubjectOffering>[]
-          : offerings.where((o) => o.professorId == selectedProfessorId).toList();
-      final subjectCodes = offeringsByProfessor
+          : offerings.where((o) => o.teacherId == selectedTeacherId).toList();
+      final subjectCodes = offeringsByTeacher
           .map((o) => o.subjectCode)
           .toSet()
           .toList()
@@ -170,7 +170,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       final selectedSubjectCode = subjectCodes.contains(_selectedSubjectCode)
           ? _selectedSubjectCode
           : (subjectCodes.isNotEmpty ? subjectCodes.first : null);
-      final sections = offeringsByProfessor
+      final sections = offeringsByTeacher
           .where((o) => o.subjectCode == selectedSubjectCode)
           .map((o) => o.section)
           .toSet()
@@ -179,7 +179,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       final selectedSection = sections.contains(_selectedSection)
           ? _selectedSection
           : (sections.isNotEmpty ? sections.first : null);
-      final selectedOfferingId = offeringsByProfessor
+      final selectedOfferingId = offeringsByTeacher
           .where((o) =>
               o.subjectCode == selectedSubjectCode && o.section == selectedSection)
           .map((o) => o.id)
@@ -188,17 +188,17 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
 
       setState(() {
         _students = students;
-        _professors = professors;
+        _teachers = teachersList;
         _offerings = offerings;
         _enrollments = enrollments;
-        _selectedOfferingProfessorId =
-            professors.any((p) => p.id == _selectedOfferingProfessorId)
-                ? _selectedOfferingProfessorId
-                : (professors.isNotEmpty ? professors.first.id : null);
+        _selectedOfferingTeacherId =
+            teachersList.any((p) => p.id == _selectedOfferingTeacherId)
+                ? _selectedOfferingTeacherId
+                : (teachersList.isNotEmpty ? teachersList.first.id : null);
         _selectedStudentId = students.any((s) => s.id == _selectedStudentId)
             ? _selectedStudentId
             : (students.isNotEmpty ? students.first.id : null);
-        _selectedProfessorId = selectedProfessorId;
+        _selectedTeacherId = selectedTeacherId;
         _selectedSubjectCode = selectedSubjectCode;
         _selectedSection = selectedSection;
         _selectedOfferingId = selectedOfferingId;
@@ -262,7 +262,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       final rows = await _db.getAdminAttendanceReport(
         from: _reportRange?.start,
         to: _reportRange?.end,
-        professorId: _reportProfessorId,
+        teacherId: _reportTeacherId,
         subjectCode: _reportSubjectCode,
         section: _reportSection,
       );
@@ -431,21 +431,21 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Create Professor Account',
+                        'Create Teacher Account',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _nameCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Professor Full Name',
+                          labelText: 'Teacher Full Name',
                         ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _userCtrl,
                         decoration: const InputDecoration(
-                          labelText: 'Professor Username',
+                          labelText: 'Teacher Username',
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -453,7 +453,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                         controller: _passCtrl,
                         obscureText: true,
                         decoration: const InputDecoration(
-                          labelText: 'Professor Password',
+                          labelText: 'Teacher Password',
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -466,12 +466,12 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Section assignment is per class offering and student enrollment. Login email is the professor username.',
+                        'Section assignment is per class offering and student enrollment. Login email is the teacher username.',
                         style: TextStyle(fontSize: 12, color: _muted),
                       ),
                       const SizedBox(height: 10),
                       FilledButton.icon(
-                        onPressed: _loading ? null : _createProfessor,
+                        onPressed: _loading ? null : _createTeacher,
                         icon: _loading
                             ? const SizedBox(
                                 width: 16,
@@ -479,7 +479,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.person_add_alt_1),
-                        label: const Text('Create Professor'),
+                        label: const Text('Create Teacher'),
                       ),
                     ],
                   ),
@@ -500,13 +500,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: _selectedOfferingProfessorId,
+                        value: _selectedOfferingTeacherId,
                         style: _dropdownTextStyle,
                         dropdownColor: _card,
                         decoration: const InputDecoration(
-                          labelText: 'Professor (owner of this class)',
+                          labelText: 'Teacher (owner of this class)',
                         ),
-                        items: _professors
+                        items: _teachers
                             .map(
                               (p) => DropdownMenuItem(
                                 value: p.id,
@@ -515,7 +515,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                             )
                             .toList(),
                         onChanged: (v) =>
-                            setState(() => _selectedOfferingProfessorId = v),
+                            setState(() => _selectedOfferingTeacherId = v),
                       ),
                       const SizedBox(height: 10),
                       TextField(
@@ -624,11 +624,11 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                initialValue: _selectedProfessorId,
+                initialValue: _selectedTeacherId,
                 style: _dropdownTextStyle,
                 dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Professor'),
-                items: _professors
+                decoration: const InputDecoration(labelText: 'Teacher'),
+                items: _teachers
                     .map((p) => DropdownMenuItem(
                           value: p.id,
                           child: _dropdownLabel(p.fullName),
@@ -636,8 +636,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                     .toList(),
                 onChanged: (v) {
                   setState(() {
-                    _selectedProfessorId = v;
-                    final codes = _subjectCodesForProfessor;
+                    _selectedTeacherId = v;
+                    final codes = _subjectCodesForTeacher;
                     _selectedSubjectCode = codes.isNotEmpty ? codes.first : null;
                     final sections = _sectionsForSubject;
                     _selectedSection = sections.isNotEmpty ? sections.first : null;
@@ -651,7 +651,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                 style: _dropdownTextStyle,
                 dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Subject'),
-                items: _subjectCodesForProfessor
+                items: _subjectCodesForTeacher
                     .map((code) => DropdownMenuItem(
                           value: code,
                           child: _dropdownLabel(code),
@@ -691,13 +691,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                 style: _dropdownTextStyle,
                 dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Resolved Class Offering'),
-                items: _filteredByProfessor
+                items: _filteredByTeacher
                     .where((o) => _selectedSubjectCode == null || o.subjectCode == _selectedSubjectCode)
                     .where((o) => _selectedSection == null || o.section == _selectedSection)
                     .map((o) => DropdownMenuItem(
                           value: o.id,
                           child: _dropdownLabel(
-                              '${o.subjectCode} ${o.section} - ${o.professorName}'),
+                              '${o.subjectCode} ${o.section} - ${o.teacherName}'),
                         ))
                     .toList(),
                 onChanged: (v) => setState(() => _selectedOfferingId = v),
@@ -728,7 +728,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                   );
                   setState(() {
                     _selectedStudentId = enrollment.studentId;
-                    _selectedProfessorId = enrollment.professorId;
+                    _selectedTeacherId = enrollment.teacherId;
                     _selectedSubjectCode = enrollment.subjectCode;
                     _selectedSection = enrollment.section;
                     _resolveSelectedOffering();
@@ -738,7 +738,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               if (_offerings.isEmpty) ...[
                 const SizedBox(height: 8),
                 const Text(
-                  'No offerings yet. Create a professor account above first.',
+                  'No offerings yet. Create a teacher account above first.',
                   style: TextStyle(color: Colors.orange),
                 ),
                 const SizedBox(height: 8),
@@ -792,18 +792,18 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                           SizedBox(
                             width: 240,
                             child: DropdownButtonFormField<String?>(
-                              value: _reportProfessorId,
+                              value: _reportTeacherId,
                               style: _dropdownTextStyle,
                               dropdownColor: _card,
                               decoration: const InputDecoration(
-                                labelText: 'Professor',
+                                labelText: 'Teacher',
                               ),
                               items: [
                                 DropdownMenuItem<String?>(
                                   value: null,
                                   child: _dropdownLabel('All'),
                                 ),
-                                ..._professors.map(
+                                ..._teachers.map(
                                   (p) => DropdownMenuItem<String?>(
                                     value: p.id,
                                     child: _dropdownLabel(p.fullName),
@@ -812,7 +812,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                               ],
                               onChanged: (v) {
                                 setState(() {
-                                  _reportProfessorId = v;
+                                  _reportTeacherId = v;
                                   _reportSubjectCode = null;
                                   _reportSection = null;
                                 });
@@ -929,7 +929,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                                     style: const TextStyle(color: Colors.white),
                                   ),
                                   subtitle: Text(
-                                    '${row.professorName} • ${row.markedAt.toLocal()}',
+                                    '${row.teacherName} • ${row.markedAt.toLocal()}',
                                     style: TextStyle(
                                       color: Colors.white.withValues(alpha: 0.78),
                                     ),
@@ -953,8 +953,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   }
 
   List<SubjectOffering> get _reportOfferingsFiltered {
-    if (_reportProfessorId == null) return _offerings;
-    return _offerings.where((o) => o.professorId == _reportProfessorId).toList();
+    if (_reportTeacherId == null) return _offerings;
+    return _offerings.where((o) => o.teacherId == _reportTeacherId).toList();
   }
 
   List<String> get _reportSubjectCodeOptions {
@@ -972,21 +972,21 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     return sections;
   }
 
-  List<SubjectOffering> get _filteredByProfessor {
-    if (_selectedProfessorId == null) return [];
+  List<SubjectOffering> get _filteredByTeacher {
+    if (_selectedTeacherId == null) return [];
     return _offerings
-        .where((o) => o.professorId == _selectedProfessorId)
+        .where((o) => o.teacherId == _selectedTeacherId)
         .toList();
   }
 
-  List<String> get _subjectCodesForProfessor {
-    final codes = _filteredByProfessor.map((o) => o.subjectCode).toSet().toList()
+  List<String> get _subjectCodesForTeacher {
+    final codes = _filteredByTeacher.map((o) => o.subjectCode).toSet().toList()
       ..sort();
     return codes;
   }
 
   List<String> get _sectionsForSubject {
-    final sections = _filteredByProfessor
+    final sections = _filteredByTeacher
         .where((o) => o.subjectCode == _selectedSubjectCode)
         .map((o) => o.section)
         .toSet()
@@ -996,7 +996,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   }
 
   void _resolveSelectedOffering() {
-    final match = _filteredByProfessor.firstWhere(
+    final match = _filteredByTeacher.firstWhere(
       (o) =>
           o.subjectCode == _selectedSubjectCode && o.section == _selectedSection,
       orElse: () => const SubjectOffering(
@@ -1006,8 +1006,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
         subjectCode: '',
         subjectTitle: '',
         section: '',
-        professorId: '',
-        professorName: '',
+        teacherId: '',
+        teacherName: '',
         beaconUuid: '',
         beaconName: '',
       ),

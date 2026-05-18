@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Shared dark theme + palette for professor session history and detail flows.
-class ProfessorAttendanceUi {
-  ProfessorAttendanceUi._();
+/// Shared dark theme + palette for teacher session history and detail flows.
+class TeacherAttendanceUi {
+  TeacherAttendanceUi._();
 
   static const Color background = Color(0xFF0D0E12);
   static const Color surface = Color(0xFF1A1C26);

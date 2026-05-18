@@ -278,7 +278,7 @@ class BleService {
         if ((uuidMatch || nameMatch) && rssi >= _rssiThreshold) {
           found = true;
           debugPrint(
-              '[BLE] ✅ PROFESSOR BEACON IN RANGE! UUID=$_targetBeaconUuid NAME=$_targetBeaconName RSSI=$rssi');
+              '[BLE] ✅ TEACHER BEACON IN RANGE! UUID=$_targetBeaconUuid NAME=$_targetBeaconName RSSI=$rssi');
           break;
         }
       }
@@ -309,14 +309,14 @@ class BleService {
     _proximityCtrl.close();
   }
 
-  // ── PROFESSOR BEACON ADVERTISING ──────────────────────────────────────
-  Future<void> startProfessorBeacon({
+  // ── TEACHER BEACON ADVERTISING ──────────────────────────────────────
+  Future<void> startTeacherBeacon({
     required String beaconUuid,
     required String localName,
   }) async {
     if (kIsWeb) {
       throw Exception(
-          'BLE advertising is not supported on Web. Start professor session from Android/iOS phone.');
+          'BLE advertising is not supported on Web. Start teacher session from Android/iOS phone.');
     }
 
     bool supported;
@@ -324,7 +324,7 @@ class BleService {
       supported = await _peripheral.isSupported;
     } on MissingPluginException {
       throw Exception(
-          'BLE peripheral plugin is unavailable on this platform. Use Android/iOS mobile app for professor sessions.');
+          'BLE peripheral plugin is unavailable on this platform. Use Android/iOS mobile app for teacher sessions.');
     }
     if (!supported) {
       throw Exception('BLE advertising is not supported on this phone');
@@ -355,7 +355,7 @@ class BleService {
         advertiseData: preferredAd,
         advertiseSettings: settings,
       );
-      debugPrint('[BLE] Professor beacon started. UUID=$beaconUuid');
+      debugPrint('[BLE] Teacher beacon started. UUID=$beaconUuid');
       return;
     } catch (e) {
       debugPrint('[BLE] Preferred advertising failed: $e');
@@ -370,15 +370,15 @@ class BleService {
       advertiseData: fallbackAd,
       advertiseSettings: settings,
     );
-    debugPrint('[BLE] Professor beacon started with fallback payload.');
+    debugPrint('[BLE] Teacher beacon started with fallback payload.');
   }
 
-  Future<void> stopProfessorBeacon() async {
+  Future<void> stopTeacherBeacon() async {
     try {
       await _peripheral.stop();
     } on MissingPluginException {
       // Ignore on unsupported platforms where plugin is not loaded.
     }
-    debugPrint('[BLE] Professor beacon stopped');
+    debugPrint('[BLE] Teacher beacon stopped');
   }
 }

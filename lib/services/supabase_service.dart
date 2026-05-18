@@ -48,8 +48,8 @@ class SubjectOffering {
     required this.subjectCode,
     required this.subjectTitle,
     required this.section,
-    required this.professorId,
-    required this.professorName,
+    required this.teacherId,
+    required this.teacherName,
     required this.beaconUuid,
     required this.beaconName,
   });
@@ -60,8 +60,8 @@ class SubjectOffering {
   final String subjectCode;
   final String subjectTitle;
   final String section;
-  final String professorId;
-  final String professorName;
+  final String teacherId;
+  final String teacherName;
   final String beaconUuid;
   final String beaconName;
 
@@ -78,8 +78,8 @@ class StudentBasic {
   final String fullName;
 }
 
-class ProfessorBasic {
-  const ProfessorBasic({
+class TeacherBasic {
+  const TeacherBasic({
     required this.id,
     required this.fullName,
   });
@@ -88,8 +88,8 @@ class ProfessorBasic {
   final String fullName;
 }
 
-class ProfessorSessionHistoryItem {
-  const ProfessorSessionHistoryItem({
+class TeacherSessionHistoryItem {
+  const TeacherSessionHistoryItem({
     required this.sessionId,
     required this.subjectCode,
     required this.subjectTitle,
@@ -129,7 +129,7 @@ class StudentAttendanceHistoryItem {
     required this.subjectCode,
     required this.subjectTitle,
     required this.section,
-    required this.professorName,
+    required this.teacherName,
     required this.sessionStartedAt,
     required this.markedAt,
   });
@@ -137,7 +137,7 @@ class StudentAttendanceHistoryItem {
   final String subjectCode;
   final String subjectTitle;
   final String section;
-  final String professorName;
+  final String teacherName;
   final DateTime sessionStartedAt;
   final DateTime markedAt;
 }
@@ -147,8 +147,8 @@ class EnrollmentRecord {
     required this.studentId,
     required this.studentName,
     required this.offeringId,
-    required this.professorId,
-    required this.professorName,
+    required this.teacherId,
+    required this.teacherName,
     required this.subjectCode,
     required this.subjectTitle,
     required this.section,
@@ -157,14 +157,14 @@ class EnrollmentRecord {
   final String studentId;
   final String studentName;
   final String offeringId;
-  final String professorId;
-  final String professorName;
+  final String teacherId;
+  final String teacherName;
   final String subjectCode;
   final String subjectTitle;
   final String section;
 
   String get label =>
-      '$studentName → $subjectCode $section ($professorName)';
+      '$studentName → $subjectCode $section ($teacherName)';
 }
 
 class AdminAttendanceReportItem {
@@ -175,8 +175,8 @@ class AdminAttendanceReportItem {
     required this.subjectCode,
     required this.subjectTitle,
     required this.section,
-    required this.professorId,
-    required this.professorName,
+    required this.teacherId,
+    required this.teacherName,
     required this.studentId,
     required this.studentName,
     required this.markedAt,
@@ -191,8 +191,8 @@ class AdminAttendanceReportItem {
   final String subjectCode;
   final String subjectTitle;
   final String section;
-  final String professorId;
-  final String professorName;
+  final String teacherId;
+  final String teacherName;
   final String studentId;
   final String studentName;
   final DateTime markedAt;
@@ -220,7 +220,7 @@ class SessionNotificationItem {
     required this.subjectCode,
     required this.subjectTitle,
     required this.section,
-    required this.professorName,
+    required this.teacherName,
     required this.startedAt,
   });
 
@@ -229,7 +229,7 @@ class SessionNotificationItem {
   final String subjectCode;
   final String subjectTitle;
   final String section;
-  final String professorName;
+  final String teacherName;
   final DateTime startedAt;
 }
 
@@ -397,27 +397,27 @@ class SupabaseService {
         .toList();
   }
 
-  Future<List<ProfessorBasic>> getAllProfessors() async {
-    final rows = await _db.from('professors').select('id, full_name').order(
+  Future<List<TeacherBasic>> getAllTeachers() async {
+    final rows = await _db.from('teachers').select('id, full_name').order(
           'full_name',
         );
     return rows
-        .map((e) => ProfessorBasic(
+        .map((e) => TeacherBasic(
               id: e['id'] as String,
               fullName: e['full_name'] as String,
             ))
         .toList();
   }
 
-  Future<String> createProfessorByAdmin({
-    required String professorId,
+  Future<String> createTeacherByAdmin({
+    required String teacherId,
     required String fullName,
     required String username,
     required String password,
     int maxStudents = 30,
   }) async {
     final params = {
-      'p_professor_id': professorId.trim(),
+      'p_teacher_id': teacherId.trim(),
       'p_full_name': fullName.trim(),
       'p_username': username.trim(),
       'p_password': password.trim(),
@@ -425,7 +425,7 @@ class SupabaseService {
     };
     try {
       final result = await _db.rpc(
-        'admin_create_professor_account',
+        'admin_create_teacher_account',
         params: params,
       );
       return result as String;
@@ -440,7 +440,7 @@ class SupabaseService {
   }
 
   Future<void> createSubjectOfferingByAdmin({
-    required String professorId,
+    required String teacherId,
     required String subjectCode,
     required String subjectTitle,
     required String section,
@@ -451,7 +451,7 @@ class SupabaseService {
       await _db.rpc(
         'admin_create_subject_offering',
         params: {
-          'p_professor_id': professorId.trim(),
+          'p_teacher_id': teacherId.trim(),
           'p_subject_code': subjectCode.trim(),
           'p_subject_title': subjectTitle.trim(),
           'p_section': section.trim(),
@@ -470,7 +470,7 @@ class SupabaseService {
   }
 
   Future<List<SubjectOffering>> getAllOfferings() async {
-    return _fetchSubjectOfferingsFromTable(professorId: null);
+    return _fetchSubjectOfferingsFromTable(teacherId: null);
   }
 
   Future<void> enrollStudentToOffering({
@@ -495,8 +495,8 @@ class SupabaseService {
         studentId: map['student_id'] as String,
         studentName: map['student_name'] as String,
         offeringId: map['offering_id'] as String,
-        professorId: map['professor_id'] as String,
-        professorName: map['professor_name'] as String,
+        teacherId: map['teacher_id'] as String,
+        teacherName: map['teacher_name'] as String,
         subjectCode: map['subject_code'] as String,
         subjectTitle: map['subject_title'] as String,
         section: map['section'] as String,
@@ -518,7 +518,7 @@ class SupabaseService {
   Future<List<AdminAttendanceReportItem>> getAdminAttendanceReport({
     DateTime? from,
     DateTime? to,
-    String? professorId,
+    String? teacherId,
     String? subjectCode,
     String? section,
   }) async {
@@ -527,7 +527,7 @@ class SupabaseService {
       params: {
         'p_from': from?.toUtc().toIso8601String(),
         'p_to': to?.toUtc().toIso8601String(),
-        'p_professor_id': professorId?.trim(),
+        'p_teacher_id': teacherId?.trim(),
         'p_subject_code': subjectCode?.trim(),
         'p_section_name': section?.trim(),
       },
@@ -547,8 +547,8 @@ class SupabaseService {
         subjectCode: (map['subject_code'] as String?) ?? 'SUBJECT',
         subjectTitle: (map['subject_title'] as String?) ?? 'Untitled',
         section: (map['section'] as String?) ?? 'N/A',
-        professorId: (map['professor_id'] as String?) ?? '',
-        professorName: (map['professor_name'] as String?) ?? 'Professor',
+        teacherId: (map['teacher_id'] as String?) ?? '',
+        teacherName: (map['teacher_name'] as String?) ?? 'Teacher',
         studentId: (map['student_id'] as String?) ?? '',
         studentName: (map['student_name'] as String?) ?? 'Student',
         markedAt: parseDbTimestamptzToLocal(map['marked_at'] as String),
@@ -585,28 +585,28 @@ class SupabaseService {
         .toList();
   }
 
-  Future<List<SubjectOffering>> getProfessorOfferings(String professorId) async {
-    return _fetchSubjectOfferingsFromTable(professorId: professorId);
+  Future<List<SubjectOffering>> getTeacherOfferings(String teacherId) async {
+    return _fetchSubjectOfferingsFromTable(teacherId: teacherId);
   }
 
   /// Loads offerings from `subject_offerings` so `beacon_uuid` / `beacon_name`
   /// always match the table (RPC cache / shape mismatches on older deployments).
   Future<List<SubjectOffering>> _fetchSubjectOfferingsFromTable({
-    String? professorId,
+    String? teacherId,
   }) async {
-    final pid = professorId?.trim();
+    final pid = teacherId?.trim();
     try {
       var q = _db
           .from('subject_offerings')
           .select(
-            'id, subject_id, section_id, professor_id, beacon_uuid, beacon_name, '
+            'id, subject_id, section_id, teacher_id, beacon_uuid, beacon_name, '
             'subjects(subject_code, subject_title), '
             'sections(section_name), '
-            'professors(full_name)',
+            'teachers(full_name)',
           )
           .eq('is_active', true);
       if (pid != null && pid.isNotEmpty) {
-        q = q.eq('professor_id', pid);
+        q = q.eq('teacher_id', pid);
       }
       final rows = await q;
       if (rows.isEmpty) return [];
@@ -626,7 +626,7 @@ class SupabaseService {
         ? await _db.rpc('get_subject_offerings_view')
         : await _db.rpc(
             'get_subject_offerings_view',
-            params: {'p_professor_id': pid},
+            params: {'p_teacher_id': pid},
           );
     if (rpcRows is! List) return [];
     return rpcRows
@@ -673,7 +673,7 @@ class SupabaseService {
   SubjectOffering _offeringFromTableRow(Map<String, dynamic> e) {
     final sub = _embeddedOne(e, 'subjects');
     final sec = _embeddedOne(e, 'sections');
-    final prof = _embeddedOne(e, 'professors');
+    final prof = _embeddedOne(e, 'teachers');
     final profName = _jsonStr(prof['full_name']);
     return SubjectOffering(
       id: _jsonStr(e['id']),
@@ -682,15 +682,15 @@ class SupabaseService {
       subjectCode: _jsonStr(sub['subject_code']),
       subjectTitle: _jsonStr(sub['subject_title']),
       section: _jsonStr(sec['section_name']),
-      professorId: _jsonStr(e['professor_id']),
-      professorName: profName.isEmpty ? 'Professor' : profName,
+      teacherId: _jsonStr(e['teacher_id']),
+      teacherName: profName.isEmpty ? 'Teacher' : profName,
       beaconUuid: _jsonStr(e['beacon_uuid']),
       beaconName: _jsonStr(e['beacon_name']),
     );
   }
 
   SubjectOffering _offeringFromMap(Map<String, dynamic> e) {
-    final profName = _jsonStr(e['professor_name']);
+    final profName = _jsonStr(e['teacher_name']);
     return SubjectOffering(
       id: _jsonStr(e['offering_id']),
       subjectId: _jsonStr(e['subject_id']),
@@ -698,15 +698,15 @@ class SupabaseService {
       subjectCode: _jsonStr(e['subject_code']),
       subjectTitle: _jsonStr(e['subject_title']),
       section: _jsonStr(e['section']),
-      professorId: _jsonStr(e['professor_id']),
-      professorName: profName.isEmpty ? 'Professor' : profName,
+      teacherId: _jsonStr(e['teacher_id']),
+      teacherName: profName.isEmpty ? 'Teacher' : profName,
       beaconUuid: _jsonStr(e['beacon_uuid']),
       beaconName: _jsonStr(e['beacon_name']),
     );
   }
 
   SubjectOffering _offeringFromSelect(Map<String, dynamic> e) {
-    final profName = _jsonStr(e['professor_name']);
+    final profName = _jsonStr(e['teacher_name']);
     return SubjectOffering(
       id: _jsonStr(e['id']),
       subjectId: _jsonStr(e['subject_id']),
@@ -714,17 +714,17 @@ class SupabaseService {
       subjectCode: _jsonStr(e['subject_code']),
       subjectTitle: _jsonStr(e['subject_title']),
       section: _jsonStr(e['section']),
-      professorId: _jsonStr(e['professor_id']),
-      professorName: profName.isEmpty ? 'Professor' : profName,
+      teacherId: _jsonStr(e['teacher_id']),
+      teacherName: profName.isEmpty ? 'Teacher' : profName,
       beaconUuid: _jsonStr(e['beacon_uuid']),
       beaconName: _jsonStr(e['beacon_name']),
     );
   }
 
-  // ── PROFESSOR ATTENDANCE ───────────────────────────────────
+  // ── TEACHER ATTENDANCE ─────────────────────────────────────
 
   Future<Map<String, dynamic>> startSession({
-    required String professorId,
+    required String teacherId,
     required String offeringId,
     required String subject,
     required String beaconUuid,
@@ -1019,7 +1019,7 @@ class SupabaseService {
                 subjectCode: offering.subjectCode,
                 subjectTitle: offering.subjectTitle,
                 section: offering.section,
-                professorName: offering.professorName,
+                teacherName: offering.teacherName,
                 startedAt: startedAt,
               ),
             );
@@ -1043,12 +1043,12 @@ class SupabaseService {
     return controller.stream;
   }
 
-  Future<List<ProfessorSessionHistoryItem>> getProfessorSessionHistory(
-    String professorId,
+  Future<List<TeacherSessionHistoryItem>> getTeacherSessionHistory(
+    String teacherId,
   ) async {
     final rows = await _db.rpc(
-      'get_professor_session_history',
-      params: {'p_professor_id': professorId},
+      'get_teacher_session_history',
+      params: {'p_teacher_id': teacherId},
     );
     if (rows is! List) return [];
 
@@ -1059,7 +1059,7 @@ class SupabaseService {
               (endedRaw is String && endedRaw.trim().isEmpty))
           ? null
           : parseDbTimestamptzToLocal(endedRaw);
-      return ProfessorSessionHistoryItem(
+      return TeacherSessionHistoryItem(
         sessionId: (map['session_id'] as String?) ?? '',
         subjectCode: (map['subject_code'] as String?) ?? 'SUBJECT',
         subjectTitle: (map['subject_title'] as String?) ?? 'Untitled',
@@ -1071,15 +1071,15 @@ class SupabaseService {
     }).toList();
   }
 
-  Future<List<SessionAttendanceDetailItem>> getSessionAttendeesForProfessor({
-    required String professorId,
+  Future<List<SessionAttendanceDetailItem>> getSessionAttendeesForTeacher({
+    required String teacherId,
     required String sessionId,
   }) async {
     try {
       final rows = await _db.rpc(
-        'get_professor_session_attendees',
+        'get_teacher_session_attendees',
         params: {
-          'p_professor_id': professorId.trim(),
+          'p_teacher_id': teacherId.trim(),
           'p_session_id': sessionId,
         },
       );
@@ -1125,7 +1125,7 @@ class SupabaseService {
           .from('subject_offerings')
           .select('id')
           .eq('id', offeringId)
-          .eq('professor_id', professorId.trim())
+          .eq('teacher_id', teacherId.trim())
           .maybeSingle();
       if (owner == null) return [];
 
@@ -1198,13 +1198,13 @@ class SupabaseService {
   }
 
   /// Teacher override from session history: mark present (manual) or absent (remove record).
-  Future<void> setProfessorSessionAttendance({
-    required String professorId,
+  Future<void> setTeacherSessionAttendance({
+    required String teacherId,
     required String sessionId,
     required String studentId,
     required bool isPresent,
   }) async {
-    final profId = professorId.trim();
+    final profId = teacherId.trim();
     final sessId = sessionId.trim();
     final stuId = studentId.trim();
     if (profId.isEmpty || sessId.isEmpty || stuId.isEmpty) {
@@ -1224,7 +1224,7 @@ class SupabaseService {
         .from('subject_offerings')
         .select('id')
         .eq('id', offeringId)
-        .eq('professor_id', profId)
+        .eq('teacher_id', profId)
         .maybeSingle();
     if (owner == null) {
       throw Exception('You do not have access to this session.');
@@ -1321,12 +1321,12 @@ class SupabaseService {
     return rows.isNotEmpty;
   }
 
-  Future<void> clearProfessorHistory(String professorId) async {
-    final id = professorId.trim();
+  Future<void> clearTeacherHistory(String teacherId) async {
+    final id = teacherId.trim();
     try {
       await _db.rpc(
-        'clear_professor_history',
-        params: {'p_professor_id': id},
+        'clear_teacher_history',
+        params: {'p_teacher_id': id},
       );
       return;
     } on PostgrestException catch (e) {
@@ -1336,19 +1336,19 @@ class SupabaseService {
     // Backward-compat: some deployments used a different RPC name.
     try {
       await _db.rpc(
-        'clear_professor_session_history',
-        params: {'p_professor_id': id},
+        'clear_teacher_session_history',
+        params: {'p_teacher_id': id},
       );
       return;
     } on PostgrestException catch (e) {
       if (e.code != 'PGRST202') rethrow;
     }
 
-    // Final fallback: direct delete through professor offerings.
+    // Final fallback: direct delete through teacher offerings.
     final rawOfferings = await _db
         .from('subject_offerings')
         .select('id')
-        .eq('professor_id', id);
+        .eq('teacher_id', id);
     final offeringIds = rawOfferings
         .cast<Map<String, dynamic>>()
         .map((e) => e['id'] as String?)
@@ -1403,7 +1403,7 @@ class SupabaseService {
         subjectCode: (map['subject_code'] as String?) ?? 'SUBJECT',
         subjectTitle: (map['subject_title'] as String?) ?? 'Untitled',
         section: (map['section'] as String?) ?? 'N/A',
-        professorName: (map['professor_name'] as String?) ?? 'Professor',
+        teacherName: (map['teacher_name'] as String?) ?? 'Teacher',
         sessionStartedAt:
             parseDbTimestamptzToLocal(map['session_started_at'] as String),
         markedAt: parseDbTimestamptzToLocal(map['marked_at'] as String),

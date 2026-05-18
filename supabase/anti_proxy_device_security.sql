@@ -1,4 +1,4 @@
--- Anti-proxy device security (Attendximity / BLE Attendance)
+-- Anti-proxy device security (Attendximity)
 -- Run this in Supabase SQL Editor after ble_attendance_schema.sql (or merge into your pipeline).
 -- Extends existing public.student_devices; adds student_login_sessions and RPCs.
 

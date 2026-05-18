@@ -4,20 +4,20 @@ import '../services/supabase_service.dart';
 import '../ui/responsive.dart';
 import '../widgets/course_dashboard_card.dart';
 import 'home_screen.dart';
-import 'professor_history_screen.dart';
-import 'professor_screen.dart';
+import 'teacher_history_screen.dart';
+import 'teacher_screen.dart';
 
-class ProfessorDashboardScreen extends StatefulWidget {
-  const ProfessorDashboardScreen({super.key, required this.user});
+class TeacherDashboardScreen extends StatefulWidget {
+  const TeacherDashboardScreen({super.key, required this.user});
 
   final AppUser user;
 
   @override
-  State<ProfessorDashboardScreen> createState() =>
-      _ProfessorDashboardScreenState();
+  State<TeacherDashboardScreen> createState() =>
+      _TeacherDashboardScreenState();
 }
 
-class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
+class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   final _db = SupabaseService();
   bool _loading = true;
   List<SubjectOffering> _offerings = [];
@@ -37,7 +37,7 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
   }
 
   Future<void> _load() async {
-    final rows = await _db.getProfessorOfferings(widget.user.linkedId);
+    final rows = await _db.getTeacherOfferings(widget.user.linkedId);
     final counts = await _db.getEnrollmentCountsForOfferings(
       rows.map((e) => e.id).toList(),
     );
@@ -55,7 +55,7 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
     final value = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Edit Professor Name'),
+        title: const Text('Edit Teacher Name'),
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(labelText: 'Full Name'),
@@ -74,7 +74,7 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
     );
     if (value == null || value.isEmpty || value == _displayName) return;
     await _db.updateDisplayName(
-      role: 'professor',
+      role: 'teacher',
       linkedId: widget.user.linkedId,
       fullName: value,
     );
@@ -98,7 +98,7 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            ProfessorHistoryScreen(professorId: widget.user.linkedId),
+            TeacherHistoryScreen(teacherId: widget.user.linkedId),
       ),
     );
   }
@@ -117,7 +117,7 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: const Text(
-              'Attendximitty',
+              'Attendximity',
               maxLines: 1,
               style: TextStyle(
                 color: Colors.white,
@@ -299,8 +299,8 @@ class _ProfessorDashboardScreenState extends State<ProfessorDashboardScreen> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => ProfessorScreen(
-                                                professorName: _displayName,
+                                              builder: (_) => TeacherScreen(
+                                                teacherName: _displayName,
                                                 offering: o,
                                               ),
                                             ),
