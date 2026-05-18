@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../ui/landing_auth_ui.dart';
 import '../ui/responsive.dart';
+import '../util/network_connectivity.dart';
 import 'admin_web_panel_screen.dart';
 import 'auth_screen.dart';
 
@@ -161,13 +162,32 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () async {
-                  final user = await _db.login(
-                    username: _adminUserCtrl.text.trim(),
-                    password: _adminPassCtrl.text.trim(),
-                    role: 'admin',
-                  );
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx, user != null && user.role == 'admin');
+                  if (!await hasNetworkConnection()) {
+                    if (!ctx.mounted) return;
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text(kNoInternetMessage)),
+                    );
+                    return;
+                  }
+                  try {
+                    final user = await _db.login(
+                      username: _adminUserCtrl.text.trim(),
+                      password: _adminPassCtrl.text.trim(),
+                      role: 'admin',
+                    );
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx, user != null && user.role == 'admin');
+                  } catch (e) {
+                    if (!ctx.mounted) return;
+                    final msg = networkErrorMessage(e);
+                    if (msg != null) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: Text(msg)),
+                      );
+                    } else {
+                      Navigator.pop(ctx, false);
+                    }
+                  }
                 },
                 child: const Text('Login'),
               ),

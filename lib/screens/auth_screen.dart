@@ -10,8 +10,9 @@ import '../services/local_session_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/landing_auth_ui.dart';
 import '../ui/responsive.dart';
-import 'teacher_dashboard_screen.dart';
+import '../util/network_connectivity.dart';
 import 'student_dashboard_screen.dart';
+import 'teacher_dashboard_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, required this.initialRole});
@@ -44,7 +45,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    _role = widget.initialRole;
+    _role = widget.initialRole == 'professor' ? 'teacher' : widget.initialRole;
     _isRegister = _role == 'student';
     _loadRemembered();
   }
@@ -101,7 +102,18 @@ class _AuthScreenState extends State<AuthScreen> {
     return null;
   }
 
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
+
   Future<void> _submit() async {
+    if (!await hasNetworkConnection()) {
+      _showMessage(kNoInternetMessage);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       if (_role == 'student' && _isRegister) {
@@ -159,12 +171,10 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      final mapped = _role == 'student' ? _studentDeviceLoginMessage(e) : null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(mapped ?? 'Auth failed: $e'),
-        ),
-      );
+      final offline = networkErrorMessage(e);
+      final mapped = offline ??
+          (_role == 'student' ? _studentDeviceLoginMessage(e) : null);
+      _showMessage(mapped ?? 'Auth failed: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -187,6 +197,7 @@ class _AuthScreenState extends State<AuthScreen> {
       data: themed,
       child: Scaffold(
         extendBodyBehindAppBar: true,
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
