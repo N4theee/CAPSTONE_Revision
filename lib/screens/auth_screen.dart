@@ -241,6 +241,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 TextField(
                                   controller: _studentIdCtrl,
                                   textInputAction: TextInputAction.next,
+                                  autofillHints: const [],
+                                  enableSuggestions: false,
                                   decoration: const InputDecoration(
                                     labelText: 'Student ID',
                                     hintText: 'Enter student ID',
@@ -254,6 +256,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 TextField(
                                   controller: _fullNameCtrl,
                                   textInputAction: TextInputAction.next,
+                                  autofillHints: const [],
+                                  enableSuggestions: false,
                                   decoration: const InputDecoration(
                                     labelText: 'Full Name',
                                     hintText: 'Enter full name',
@@ -269,6 +273,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 controller: _userCtrl,
                                 textInputAction: TextInputAction.next,
                                 autocorrect: false,
+                                autofillHints: const [],
+                                enableSuggestions: false,
                                 decoration: const InputDecoration(
                                   labelText: 'Username',
                                   hintText: 'Enter username',
@@ -283,6 +289,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                 controller: _passCtrl,
                                 obscureText: _obscurePassword,
                                 textInputAction: TextInputAction.done,
+                                autofillHints: const [],
+                                enableSuggestions: false,
                                 onSubmitted: (_) {
                                   if (!_loading) _submit();
                                 },

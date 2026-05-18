@@ -82,12 +82,7 @@ class LandingAuthUi {
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        floatingLabelStyle: const TextStyle(
-          color: label,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-        floatingLabelBehavior: FloatingLabelBehavior.always,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
         hintStyle: const TextStyle(color: hint, fontSize: 15),
         helperStyle: TextStyle(color: textSecondary.withValues(alpha: 0.95)),
         errorStyle: const TextStyle(color: Color(0xFFFCA5A5)),

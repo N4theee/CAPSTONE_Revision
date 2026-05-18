@@ -1197,6 +1197,80 @@ class SupabaseService {
     }
   }
 
+  /// Teacher override from session history: mark present (manual) or absent (remove record).
+  Future<void> setProfessorSessionAttendance({
+    required String professorId,
+    required String sessionId,
+    required String studentId,
+    required bool isPresent,
+  }) async {
+    final profId = professorId.trim();
+    final sessId = sessionId.trim();
+    final stuId = studentId.trim();
+    if (profId.isEmpty || sessId.isEmpty || stuId.isEmpty) {
+      throw Exception('Missing session or student.');
+    }
+
+    final sessionRow = await _db
+        .from('attendance_sessions')
+        .select('subject_offering_id')
+        .eq('id', sessId)
+        .maybeSingle();
+    if (sessionRow == null) {
+      throw Exception('Session not found.');
+    }
+    final offeringId = _jsonStr(sessionRow['subject_offering_id']);
+    final owner = await _db
+        .from('subject_offerings')
+        .select('id')
+        .eq('id', offeringId)
+        .eq('professor_id', profId)
+        .maybeSingle();
+    if (owner == null) {
+      throw Exception('You do not have access to this session.');
+    }
+
+    if (!isPresent) {
+      await _db
+          .from('attendance_records')
+          .delete()
+          .eq('attendance_session_id', sessId)
+          .eq('student_id', stuId);
+      return;
+    }
+
+    try {
+      await _db.from('attendance_records').upsert(
+        {
+          'attendance_session_id': sessId,
+          'student_id': stuId,
+          'student_device_id': null,
+          'status': 'Present',
+          'marked_at': utcIsoNowForDb(),
+          'device_name': 'Manual (teacher)',
+        },
+        onConflict: 'attendance_session_id,student_id',
+      );
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST204' &&
+          (e.message.contains('device_name') ||
+              e.message.contains('onConflict'))) {
+        await _db.from('attendance_records').upsert(
+          {
+            'attendance_session_id': sessId,
+            'student_id': stuId,
+            'student_device_id': null,
+            'status': 'Present',
+            'marked_at': utcIsoNowForDb(),
+          },
+          onConflict: 'attendance_session_id,student_id',
+        );
+        return;
+      }
+      rethrow;
+    }
+  }
+
   Future<List<AttendanceAnomaly>> getSessionDeviceAnomalies(
     String sessionId,
   ) async {

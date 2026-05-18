@@ -51,6 +51,12 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   static const _accent = Color(0xFF8B5CF6);
   static const _muted = Color(0xFFCBD5E1);
   static const _border = Color(0xFF334155);
+  static const _dropdownTextStyle = TextStyle(
+    color: Color(0xFFF8FAFC),
+    fontSize: 15,
+  );
+
+  Text _dropdownLabel(String text) => Text(text, style: _dropdownTextStyle);
 
   @override
   void initState() {
@@ -330,11 +336,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        floatingLabelStyle: const TextStyle(
-          color: label,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
+        floatingLabelBehavior: FloatingLabelBehavior.never,
         hintStyle: const TextStyle(color: hint, fontSize: 15),
         helperStyle: TextStyle(color: _muted.withValues(alpha: 0.95)),
         errorStyle: const TextStyle(color: Color(0xFFFCA5A5)),
@@ -370,6 +372,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
         ),
       ),
       dividerTheme: const DividerThemeData(color: _border),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: const TextStyle(color: inputText, fontSize: 15),
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(_card),
+          surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
+        ),
+      ),
     );
 
     final screenW = MediaQuery.sizeOf(context).width;
@@ -492,6 +501,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         value: _selectedOfferingProfessorId,
+                        style: _dropdownTextStyle,
+                        dropdownColor: _card,
                         decoration: const InputDecoration(
                           labelText: 'Professor (owner of this class)',
                         ),
@@ -499,7 +510,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                             .map(
                               (p) => DropdownMenuItem(
                                 value: p.id,
-                                child: Text(p.fullName),
+                                child: _dropdownLabel(p.fullName),
                               ),
                             )
                             .toList(),
@@ -531,6 +542,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _selectedBeaconUuid,
+                              style: _dropdownTextStyle,
+                              dropdownColor: _card,
                               decoration: const InputDecoration(
                                 labelText: 'Beacon UUID',
                               ),
@@ -540,7 +553,10 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                                       value: u,
                                       child: Text(
                                         u,
-                                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                                        style: _dropdownTextStyle.copyWith(
+                                          fontFamily: 'monospace',
+                                          fontSize: 12,
+                                        ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -595,11 +611,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _selectedStudentId,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Student'),
                 items: _students
                     .map((s) => DropdownMenuItem(
                           value: s.id,
-                          child: Text(s.fullName),
+                          child: _dropdownLabel(s.fullName),
                         ))
                     .toList(),
                 onChanged: (v) => setState(() => _selectedStudentId = v),
@@ -607,11 +625,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _selectedProfessorId,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Professor'),
                 items: _professors
                     .map((p) => DropdownMenuItem(
                           value: p.id,
-                          child: Text(p.fullName),
+                          child: _dropdownLabel(p.fullName),
                         ))
                     .toList(),
                 onChanged: (v) {
@@ -628,11 +648,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _selectedSubjectCode,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Subject'),
                 items: _subjectCodesForProfessor
                     .map((code) => DropdownMenuItem(
                           value: code,
-                          child: Text(code),
+                          child: _dropdownLabel(code),
                         ))
                     .toList(),
                 onChanged: (v) {
@@ -647,11 +669,13 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _selectedSection,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Section'),
                 items: _sectionsForSubject
                     .map((section) => DropdownMenuItem(
                           value: section,
-                          child: Text(section),
+                          child: _dropdownLabel(section),
                         ))
                     .toList(),
                 onChanged: (v) {
@@ -664,13 +688,15 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: _selectedOfferingId,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(labelText: 'Resolved Class Offering'),
                 items: _filteredByProfessor
                     .where((o) => _selectedSubjectCode == null || o.subjectCode == _selectedSubjectCode)
                     .where((o) => _selectedSection == null || o.section == _selectedSection)
                     .map((o) => DropdownMenuItem(
                           value: o.id,
-                          child: Text(
+                          child: _dropdownLabel(
                               '${o.subjectCode} ${o.section} - ${o.professorName}'),
                         ))
                     .toList(),
@@ -679,13 +705,15 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _selectedEnrollmentKey,
+                style: _dropdownTextStyle,
+                dropdownColor: _card,
                 decoration: const InputDecoration(
                   labelText: 'Existing Enrollment (for editing/removal)',
                 ),
                 items: _enrollments
                     .map((e) => DropdownMenuItem(
                           value: '${e.studentId}|${e.offeringId}',
-                          child: Text(e.label),
+                          child: _dropdownLabel(e.label),
                         ))
                     .toList(),
                 onChanged: (v) {
@@ -765,18 +793,20 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                             width: 240,
                             child: DropdownButtonFormField<String?>(
                               value: _reportProfessorId,
+                              style: _dropdownTextStyle,
+                              dropdownColor: _card,
                               decoration: const InputDecoration(
                                 labelText: 'Professor',
                               ),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('All'),
+                                  child: _dropdownLabel('All'),
                                 ),
                                 ..._professors.map(
                                   (p) => DropdownMenuItem<String?>(
                                     value: p.id,
-                                    child: Text(p.fullName),
+                                    child: _dropdownLabel(p.fullName),
                                   ),
                                 ),
                               ],
@@ -793,18 +823,20 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                             width: 180,
                             child: DropdownButtonFormField<String?>(
                               value: _reportSubjectCode,
+                              style: _dropdownTextStyle,
+                              dropdownColor: _card,
                               decoration: const InputDecoration(
                                 labelText: 'Subject',
                               ),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('All'),
+                                  child: _dropdownLabel('All'),
                                 ),
                                 ..._reportSubjectCodeOptions.map(
                                   (c) => DropdownMenuItem<String?>(
                                     value: c,
-                                    child: Text(c),
+                                    child: _dropdownLabel(c),
                                   ),
                                 ),
                               ],
@@ -820,18 +852,20 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                             width: 180,
                             child: DropdownButtonFormField<String?>(
                               value: _reportSection,
+                              style: _dropdownTextStyle,
+                              dropdownColor: _card,
                               decoration: const InputDecoration(
                                 labelText: 'Section',
                               ),
                               items: [
-                                const DropdownMenuItem<String?>(
+                                DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text('All'),
+                                  child: _dropdownLabel('All'),
                                 ),
                                 ..._reportSectionOptions.map(
                                   (s) => DropdownMenuItem<String?>(
                                     value: s,
-                                    child: Text(s),
+                                    child: _dropdownLabel(s),
                                   ),
                                 ),
                               ],

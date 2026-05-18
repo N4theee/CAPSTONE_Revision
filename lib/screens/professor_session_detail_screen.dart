@@ -23,6 +23,7 @@ class _ProfessorSessionDetailScreenState
     extends State<ProfessorSessionDetailScreen> {
   final _db = SupabaseService();
   late Future<Map<String, dynamic>> _detailsFuture;
+  String? _updatingStudentId;
 
   @override
   void initState() {
@@ -31,7 +32,9 @@ class _ProfessorSessionDetailScreenState
   }
 
   void _retry() {
-    setState(() => _detailsFuture = _load());
+    setState(() {
+      _detailsFuture = _load();
+    });
   }
 
   Future<Map<String, dynamic>> _load() async {
@@ -49,6 +52,131 @@ class _ProfessorSessionDetailScreenState
       anomalies = const [];
     }
     return {'attendees': attendees, 'anomalies': anomalies};
+  }
+
+  Future<void> _setAttendance({
+    required SessionAttendanceDetailItem detail,
+    required bool isPresent,
+  }) async {
+    if (_updatingStudentId != null) return;
+    setState(() => _updatingStudentId = detail.studentId);
+    try {
+      await _db.setProfessorSessionAttendance(
+        professorId: widget.professorId,
+        sessionId: widget.session.sessionId,
+        studentId: detail.studentId,
+        isPresent: isPresent,
+      );
+      if (!mounted) return;
+      _retry();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPresent
+                ? '${detail.studentName} marked present.'
+                : '${detail.studentName} marked absent.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update attendance: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _updatingStudentId = null);
+    }
+  }
+
+  Future<void> _showEditSheet(SessionAttendanceDetailItem detail) async {
+    final busy = _updatingStudentId == detail.studentId;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ProfessorAttendanceUi.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: ProfessorAttendanceUi.textSecondary
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  detail.studentName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Update attendance for this session',
+                  style: TextStyle(
+                    color: ProfessorAttendanceUi.textSecondary
+                        .withValues(alpha: 0.95),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (busy)
+                  const Center(child: CircularProgressIndicator())
+                else ...[
+                  FilledButton.icon(
+                    onPressed: detail.isPresent
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _setAttendance(detail: detail, isPresent: true);
+                          },
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    label: const Text('Mark as Present'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ProfessorAttendanceUi.presentGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: !detail.isPresent
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _setAttendance(detail: detail, isPresent: false);
+                          },
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Mark as Absent'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ProfessorAttendanceUi.absentOrange,
+                      side: const BorderSide(
+                        color: ProfessorAttendanceUi.absentOrange,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -136,7 +264,7 @@ class _ProfessorSessionDetailScreenState
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Enrolled students — Absent if they did not mark attendance',
+                          'Enrolled students — tap Edit to mark Present or Absent',
                           style: TextStyle(
                             color: ProfessorAttendanceUi.textSecondary
                                 .withValues(alpha: 0.95),
@@ -169,13 +297,16 @@ class _ProfessorSessionDetailScreenState
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 10),
                 itemBuilder: (_, i) {
+                  final detail = attendees[i];
                   return Align(
                     alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxW),
                       child: _AttendanceTile(
-                        detail: attendees[i],
+                        detail: detail,
                         wideLayout: useWide,
+                        isUpdating: _updatingStudentId == detail.studentId,
+                        onEdit: () => _showEditSheet(detail),
                       ),
                     ),
                   );
@@ -325,10 +456,14 @@ class _AttendanceTile extends StatelessWidget {
   const _AttendanceTile({
     required this.detail,
     required this.wideLayout,
+    required this.onEdit,
+    required this.isUpdating,
   });
 
   final SessionAttendanceDetailItem detail;
   final bool wideLayout;
+  final VoidCallback onEdit;
+  final bool isUpdating;
 
   @override
   Widget build(BuildContext context) {
@@ -375,6 +510,23 @@ class _AttendanceTile extends StatelessWidget {
     final subtitle = detail.isPresent
         ? 'Device: ${detail.deviceUsed ?? 'Unknown'}'
         : 'Did not mark attendance';
+
+    final editControl = isUpdating
+        ? const SizedBox(
+            width: 36,
+            height: 36,
+            child: Padding(
+              padding: EdgeInsets.all(8),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        : IconButton(
+            tooltip: 'Edit attendance',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+            color: ProfessorAttendanceUi.textSecondary,
+            visualDensity: VisualDensity.compact,
+          );
 
     final textBlock = Expanded(
       child: Column(
@@ -440,10 +592,10 @@ class _AttendanceTile extends StatelessWidget {
                   ),
                   const SizedBox(width: 14),
                   textBlock,
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [badge],
+                    children: [badge, editControl],
                   ),
                 ],
               )
@@ -464,10 +616,10 @@ class _AttendanceTile extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   textBlock,
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [badge],
+                    children: [badge, editControl],
                   ),
                 ],
               ),
