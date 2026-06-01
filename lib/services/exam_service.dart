@@ -22,6 +22,7 @@ class ExamSession {
     this.startsAt,
     this.endsAt,
     required this.createdAt,
+    this.durationMinutes = 60,
   });
 
   final String id;
@@ -36,6 +37,7 @@ class ExamSession {
   final DateTime? startsAt;
   final DateTime? endsAt;
   final DateTime createdAt;
+  final int durationMinutes;
 
   bool get isActive => status == 'active';
 
@@ -56,6 +58,11 @@ class ExamAttempt {
     required this.startedAt,
     this.endedAt,
     this.violationCount = 0,
+    this.rawScore = 0,
+    this.totalPoints = 0,
+    this.percentageScore = 0,
+    this.completionSeconds = 0,
+    this.submittedAt,
   });
 
   final String id;
@@ -65,9 +72,89 @@ class ExamAttempt {
   final DateTime startedAt;
   final DateTime? endedAt;
   final int violationCount;
+  final int rawScore;
+  final int totalPoints;
+  final double percentageScore;
+  final int completionSeconds;
+  final DateTime? submittedAt;
 
   bool get isTerminal =>
       status == 'completed' || status == 'auto_ended' || status == 'flagged';
+
+  bool get canSubmitMcq =>
+      status == 'in_progress';
+}
+
+class ExamChoice {
+  const ExamChoice({
+    required this.id,
+    required this.examQuestionId,
+    required this.choiceText,
+    required this.isCorrect,
+    required this.choiceOrder,
+  });
+
+  final String id;
+  final String examQuestionId;
+  final String choiceText;
+  final bool isCorrect;
+  final int choiceOrder;
+}
+
+class ExamQuestion {
+  const ExamQuestion({
+    required this.id,
+    required this.examSessionId,
+    required this.questionText,
+    required this.points,
+    required this.questionOrder,
+    required this.choices,
+  });
+
+  final String id;
+  final String examSessionId;
+  final String questionText;
+  final int points;
+  final int questionOrder;
+  final List<ExamChoice> choices;
+}
+
+/// Draft for teacher create-exam UI (choices include correct flag).
+class ExamQuestionDraft {
+  ExamQuestionDraft({
+    this.questionText = '',
+    this.points = 1,
+    List<ExamChoiceDraft>? choices,
+    this.correctChoiceIndex = 0,
+  }) : choices = choices ?? ExamChoiceDraft.fourEmpty();
+
+  String questionText;
+  int points;
+  int correctChoiceIndex;
+  final List<ExamChoiceDraft> choices;
+}
+
+class ExamChoiceDraft {
+  ExamChoiceDraft({this.text = ''});
+
+  String text;
+
+  static List<ExamChoiceDraft> fourEmpty() =>
+      List.generate(4, (_) => ExamChoiceDraft());
+}
+
+class ExamSubmitResult {
+  const ExamSubmitResult({
+    required this.rawScore,
+    required this.totalPoints,
+    required this.percentageScore,
+    required this.completionSeconds,
+  });
+
+  final int rawScore;
+  final int totalPoints;
+  final double percentageScore;
+  final int completionSeconds;
 }
 
 class ExamAttemptMonitorRow {
@@ -124,6 +211,8 @@ class ExamRankingRow {
     required this.overallScore,
     this.rankNumber,
     this.remarks,
+    this.completionSeconds,
+    this.violationCount = 0,
   });
 
   final String studentId;
@@ -134,6 +223,8 @@ class ExamRankingRow {
   final double overallScore;
   final int? rankNumber;
   final String? remarks;
+  final int? completionSeconds;
+  final int violationCount;
 }
 
 class StudentExamHistoryItem {
@@ -205,6 +296,7 @@ class ExamService {
       startsAt: tryParseDbTimestamptzToLocal(m['starts_at']),
       endsAt: tryParseDbTimestamptzToLocal(m['ends_at']),
       createdAt: tryParseDbTimestamptzToLocal(m['created_at']) ?? DateTime.now(),
+      durationMinutes: (m['duration_minutes'] as num?)?.toInt() ?? 60,
     );
   }
 
@@ -218,6 +310,23 @@ class ExamService {
           tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now(),
       endedAt: tryParseDbTimestamptzToLocal(m['ended_at']),
       violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
+      rawScore: (m['raw_score'] as num?)?.toInt() ?? 0,
+      totalPoints: (m['total_points'] as num?)?.toInt() ?? 0,
+      percentageScore: (m['percentage_score'] as num?)?.toDouble() ??
+          (m['exam_score'] as num?)?.toDouble() ??
+          0,
+      completionSeconds: (m['completion_seconds'] as num?)?.toInt() ?? 0,
+      submittedAt: tryParseDbTimestamptzToLocal(m['submitted_at']),
+    );
+  }
+
+  ExamChoice _examChoiceFromMap(Map<String, dynamic> m) {
+    return ExamChoice(
+      id: _jsonStr(m['id']),
+      examQuestionId: _jsonStr(m['exam_question_id']),
+      choiceText: _jsonStr(m['choice_text']),
+      isCorrect: m['is_correct'] as bool? ?? false,
+      choiceOrder: (m['choice_order'] as num?)?.toInt() ?? 1,
     );
   }
 
@@ -320,6 +429,7 @@ class ExamService {
     required String status,
     int rssiThreshold = -85,
     int gracePeriodSeconds = 30,
+    int durationMinutes = 60,
     DateTime? startsAt,
     DateTime? endsAt,
     String? examCode,
@@ -337,6 +447,7 @@ class ExamService {
         'ble_uuid': bleUuid.trim(),
         'rssi_threshold': rssiThreshold,
         'grace_period_seconds': gracePeriodSeconds,
+        'duration_minutes': durationMinutes,
         'status': status,
       };
       if (startsAt != null) {
@@ -477,12 +588,12 @@ class ExamService {
     return raw.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
   }
 
-  /// Uses the more lenient (more negative) RSSI so exam join matches attendance.
-  static int effectiveProximityRssi(int sessionRssi) {
-    return sessionRssi < AppConfig.rssiThreshold
-        ? sessionRssi
-        : AppConfig.rssiThreshold;
-  }
+  /// RSSI threshold for continuous exam proximity monitoring (from session row).
+  static int effectiveProximityRssi(int sessionRssi) => sessionRssi;
+
+  /// Forgiving fixed threshold when joining an exam (weaker signal allowed).
+  static int examJoinProximityRssi(int sessionRssi) =>
+      AppConfig.examJoinRssiThreshold;
 
   /// Prefer session UUID; fall back to the class offering beacon.
   static String resolveBeaconUuid({
@@ -718,7 +829,7 @@ class ExamService {
         'student_id': studentId.trim(),
         'exam_session_id': examSessionId,
         'is_in_range': isInRange,
-        if (rssi != null) 'rssi': rssi,
+        'rssi': ?rssi,
       });
     } catch (e) {
       _rethrowPostgrest(e, 'saveProximityLog failed');
@@ -870,17 +981,443 @@ class ExamService {
     return controller.stream;
   }
 
+  // ── MCQ questions / choices / answers ─────────────────────────────────────
+
+  /// Validates [drafts] for teacher create-exam flow.
+  static void validateQuestionDrafts(List<ExamQuestionDraft> drafts) {
+    if (drafts.isEmpty) {
+      throw ExamServiceException('Add at least one question.');
+    }
+    for (var i = 0; i < drafts.length; i++) {
+      final q = drafts[i];
+      final n = i + 1;
+      if (q.questionText.trim().isEmpty) {
+        throw ExamServiceException('Question $n needs question text.');
+      }
+      if (q.points < 1) {
+        throw ExamServiceException('Question $n must have at least 1 point.');
+      }
+      for (var j = 0; j < q.choices.length; j++) {
+        if (q.choices[j].text.trim().isEmpty) {
+          throw ExamServiceException(
+            'Question $n: fill all four choices (A–D).',
+          );
+        }
+      }
+      if (q.correctChoiceIndex < 0 || q.correctChoiceIndex > 3) {
+        throw ExamServiceException('Question $n: select the correct answer.');
+      }
+    }
+  }
+
+  Future<ExamSession> createExamWithQuestions({
+    required String subjectOfferingId,
+    required String teacherId,
+    required String examTitle,
+    required String bleUuid,
+    required String status,
+    required List<ExamQuestionDraft> questions,
+    int rssiThreshold = -85,
+    int gracePeriodSeconds = 30,
+    int durationMinutes = 60,
+    DateTime? startsAt,
+    DateTime? endsAt,
+    String? examCode,
+  }) async {
+    validateQuestionDrafts(questions);
+    final session = await createExamSession(
+      subjectOfferingId: subjectOfferingId,
+      teacherId: teacherId,
+      examTitle: examTitle,
+      bleUuid: bleUuid,
+      status: status,
+      rssiThreshold: rssiThreshold,
+      gracePeriodSeconds: gracePeriodSeconds,
+      durationMinutes: durationMinutes,
+      startsAt: startsAt,
+      endsAt: endsAt,
+      examCode: examCode,
+    );
+    for (var i = 0; i < questions.length; i++) {
+      final draft = questions[i];
+      final questionId = await addExamQuestion(
+        examSessionId: session.id,
+        questionText: draft.questionText.trim(),
+        points: draft.points,
+        questionOrder: i + 1,
+      );
+      await addExamChoices(
+        examQuestionId: questionId,
+        choices: draft.choices,
+        correctChoiceIndex: draft.correctChoiceIndex,
+      );
+    }
+    return session;
+  }
+
+  Future<String> addExamQuestion({
+    required String examSessionId,
+    required String questionText,
+    required int points,
+    required int questionOrder,
+  }) async {
+    try {
+      final row = await _db
+          .from('exam_questions')
+          .insert({
+            'exam_session_id': examSessionId,
+            'question_text': questionText,
+            'points': points,
+            'question_order': questionOrder,
+          })
+          .select('id')
+          .single();
+      return _jsonStr(row['id']);
+    } catch (e) {
+      if (e is ExamServiceException) rethrow;
+      _rethrowPostgrest(e, 'addExamQuestion failed');
+    }
+  }
+
+  Future<void> addExamChoices({
+    required String examQuestionId,
+    required List<ExamChoiceDraft> choices,
+    required int correctChoiceIndex,
+  }) async {
+    try {
+      final payload = <Map<String, dynamic>>[];
+      for (var i = 0; i < choices.length; i++) {
+        payload.add({
+          'exam_question_id': examQuestionId,
+          'choice_text': choices[i].text.trim(),
+          'is_correct': i == correctChoiceIndex,
+          'choice_order': i + 1,
+        });
+      }
+      await _db.from('exam_choices').insert(payload);
+    } catch (e) {
+      _rethrowPostgrest(e, 'addExamChoices failed');
+    }
+  }
+
+  Future<List<ExamQuestion>> getExamQuestionsWithChoices(
+    String examSessionId, {
+    bool includeCorrectFlags = false,
+  }) async {
+    try {
+      final qRows = await _db
+          .from('exam_questions')
+          .select()
+          .eq('exam_session_id', examSessionId)
+          .order('question_order', ascending: true);
+      if (qRows.isEmpty) return [];
+
+      final questionIds = qRows
+          .map((r) => _jsonStr(
+                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+              ))
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      final cRows = await _db
+          .from('exam_choices')
+          .select()
+          .inFilter('exam_question_id', questionIds)
+          .order('choice_order', ascending: true);
+
+      final choicesByQuestion = <String, List<ExamChoice>>{};
+      for (final row in cRows) {
+        final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
+        final choice = _examChoiceFromMap(m);
+        if (!includeCorrectFlags && choice.isCorrect) {
+          // Student view: strip correct flag (still need choices for UI)
+        }
+        final list = choicesByQuestion.putIfAbsent(
+          choice.examQuestionId,
+          () => <ExamChoice>[],
+        );
+        list.add(
+          ExamChoice(
+            id: choice.id,
+            examQuestionId: choice.examQuestionId,
+            choiceText: choice.choiceText,
+            isCorrect: includeCorrectFlags ? choice.isCorrect : false,
+            choiceOrder: choice.choiceOrder,
+          ),
+        );
+      }
+
+      final questions = <ExamQuestion>[];
+      for (final row in qRows) {
+        final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
+        final id = _jsonStr(m['id']);
+        questions.add(
+          ExamQuestion(
+            id: id,
+            examSessionId: _jsonStr(m['exam_session_id']),
+            questionText: _jsonStr(m['question_text']),
+            points: (m['points'] as num?)?.toInt() ?? 1,
+            questionOrder: (m['question_order'] as num?)?.toInt() ?? 1,
+            choices: choicesByQuestion[id] ?? const [],
+          ),
+        );
+      }
+      return questions;
+    } catch (e) {
+      _rethrowPostgrest(e, 'getExamQuestionsWithChoices failed');
+    }
+  }
+
+  Future<int> countExamQuestions(String examSessionId) async {
+    try {
+      final rows = await _db
+          .from('exam_questions')
+          .select('id')
+          .eq('exam_session_id', examSessionId);
+      return rows.length;
+    } catch (e) {
+      _rethrowPostgrest(e, 'countExamQuestions failed');
+    }
+  }
+
+  /// Performance recommendation from percentage score and violations.
+  static String buildPerformanceRemarks({
+    required double percentageScore,
+    required int violationCount,
+  }) {
+    final parts = <String>[];
+    if (percentageScore >= 90) {
+      parts.add('Excellent performance');
+    } else if (percentageScore >= 80) {
+      parts.add('Very good performance');
+    } else if (percentageScore >= 75) {
+      parts.add('Passed but needs improvement');
+    } else {
+      parts.add('Needs remediation');
+    }
+    if (violationCount > 0) {
+      parts.add('Review proximity violations');
+    }
+    return parts.join('. ');
+  }
+
+  /// Submits MCQ answers, scores attempt, and refreshes session rankings.
+  Future<ExamSubmitResult> submitExamAttempt({
+    required String attemptId,
+    required Map<String, String> answersByQuestionId,
+  }) async {
+    try {
+      final attemptRow = await _db
+          .from('exam_attempts')
+          .select()
+          .eq('id', attemptId)
+          .maybeSingle();
+      if (attemptRow == null) {
+        throw ExamServiceException('Exam attempt not found.');
+      }
+      final attempt = _examAttemptFromMap(
+        Map<String, dynamic>.from(attemptRow),
+      );
+      if (!attempt.canSubmitMcq) {
+        throw ExamServiceException(
+          'This exam was already submitted (${attempt.status}).',
+        );
+      }
+
+      final questions = await getExamQuestionsWithChoices(
+        attempt.examSessionId,
+        includeCorrectFlags: true,
+      );
+      if (questions.isEmpty) {
+        throw ExamServiceException(
+          'This exam has no questions yet. Ask your teacher to add questions.',
+        );
+      }
+
+      var rawScore = 0;
+      var totalPoints = 0;
+      final answerRows = <Map<String, dynamic>>[];
+
+      for (final q in questions) {
+        totalPoints += q.points;
+        final selectedId = answersByQuestionId[q.id]?.trim() ?? '';
+        ExamChoice? selected;
+        ExamChoice? correct;
+        for (final c in q.choices) {
+          if (c.isCorrect) correct = c;
+          if (c.id == selectedId) selected = c;
+        }
+        final isCorrect =
+            selected != null && correct != null && selected.id == correct.id;
+        final pointsAwarded = isCorrect ? q.points : 0;
+        rawScore += pointsAwarded;
+
+        answerRows.add({
+          'exam_attempt_id': attemptId,
+          'exam_question_id': q.id,
+          'selected_choice_id': selectedId.isEmpty ? null : selectedId,
+          'is_correct': isCorrect,
+          'points_awarded': pointsAwarded,
+          'answered_at': utcIsoNowForDb(),
+        });
+      }
+
+      final percentageScore =
+          totalPoints > 0 ? (rawScore / totalPoints) * 100.0 : 0.0;
+      final now = DateTime.now().toUtc();
+      final completionSeconds = now
+          .difference(attempt.startedAt.toUtc())
+          .inSeconds
+          .clamp(0, 86400);
+
+      await _db.from('exam_answers').upsert(
+        answerRows,
+        onConflict: 'exam_attempt_id,exam_question_id',
+      );
+
+      await _db.from('exam_attempts').update({
+        'status': 'completed',
+        'raw_score': rawScore,
+        'total_points': totalPoints,
+        'percentage_score': percentageScore,
+        'exam_score': percentageScore,
+        'completion_seconds': completionSeconds,
+        'submitted_at': utcIsoNowForDb(),
+        'ended_at': utcIsoNowForDb(),
+      }).eq('id', attemptId);
+
+      await recomputeExamRankingsForSession(attempt.examSessionId);
+
+      debugPrint(
+        '[ExamService] Submitted $attemptId: $rawScore/$totalPoints '
+        '(${percentageScore.toStringAsFixed(1)}%)',
+      );
+
+      return ExamSubmitResult(
+        rawScore: rawScore,
+        totalPoints: totalPoints,
+        percentageScore: percentageScore,
+        completionSeconds: completionSeconds,
+      );
+    } catch (e) {
+      if (e is ExamServiceException) rethrow;
+      _rethrowPostgrest(e, 'submitExamAttempt failed');
+    }
+  }
+
+  /// Ranks completed attempts and upserts [exam_rankings] for the session.
+  Future<void> recomputeExamRankingsForSession(String examSessionId) async {
+    try {
+      final attemptsRaw = await _db
+          .from('exam_attempts')
+          .select(
+            'id, student_id, status, percentage_score, exam_score, '
+            'completion_seconds, violation_count, students(full_name)',
+          )
+          .eq('exam_session_id', examSessionId)
+          .eq('status', 'completed');
+
+      final ranked = <({
+        String studentId,
+        String studentName,
+        double percentageScore,
+        int completionSeconds,
+        int violationCount,
+      })>[];
+
+      for (final row in attemptsRaw) {
+        final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
+        final pct = (m['percentage_score'] as num?)?.toDouble() ??
+            (m['exam_score'] as num?)?.toDouble() ??
+            0;
+        final students = m['students'];
+        var name = 'Student';
+        if (students is Map) {
+          final n = _jsonStr(students['full_name']);
+          if (n.isNotEmpty) name = n;
+        }
+        ranked.add((
+          studentId: _jsonStr(m['student_id']),
+          studentName: name,
+          percentageScore: pct,
+          completionSeconds: (m['completion_seconds'] as num?)?.toInt() ?? 0,
+          violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
+        ));
+      }
+
+      ranked.sort((a, b) {
+        final byScore = b.percentageScore.compareTo(a.percentageScore);
+        if (byScore != 0) return byScore;
+        final bySpeed = a.completionSeconds.compareTo(b.completionSeconds);
+        if (bySpeed != 0) return bySpeed;
+        return a.violationCount.compareTo(b.violationCount);
+      });
+
+      for (var i = 0; i < ranked.length; i++) {
+        final r = ranked[i];
+        final rankNum = i + 1;
+        final remarks = buildPerformanceRemarks(
+          percentageScore: r.percentageScore,
+          violationCount: r.violationCount,
+        );
+        final speedPoints = r.completionSeconds > 0
+            ? (10000 / r.completionSeconds).clamp(0.0, 9999.0)
+            : 0.0;
+        await _db.from('exam_rankings').upsert(
+          {
+            'exam_session_id': examSessionId,
+            'student_id': r.studentId,
+            'exam_score': r.percentageScore,
+            'speed_points': speedPoints,
+            'violation_penalty': r.violationCount.toDouble(),
+            'overall_score': r.percentageScore,
+            'rank_number': rankNum,
+            'remarks': remarks,
+          },
+          onConflict: 'exam_session_id,student_id',
+        );
+      }
+      debugPrint(
+        '[ExamService] Recomputed ${ranked.length} rankings for $examSessionId',
+      );
+    } catch (e) {
+      _rethrowPostgrest(e, 'recomputeExamRankingsForSession failed');
+    }
+  }
+
+  static String formatCompletionTime(int? seconds) {
+    if (seconds == null || seconds <= 0) return '—';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m > 0) return '${m}m ${s}s';
+    return '${s}s';
+  }
+
   // ── 9) Rankings ────────────────────────────────────────────────────────────
 
   Future<List<ExamRankingRow>> getExamRankings(String examSessionId) async {
     try {
+      await recomputeExamRankingsForSession(examSessionId);
+
       final rows = await _db
           .from('exam_rankings')
           .select(
             'student_id, exam_score, speed_points, violation_penalty, overall_score, rank_number, remarks, students(full_name)',
           )
-          .eq('exam_session_id', examSessionId)
-          .order('rank_number', ascending: true);
+          .eq('exam_session_id', examSessionId);
+
+      final attemptByStudent = <String, Map<String, dynamic>>{};
+      try {
+        final attemptsRaw = await _db
+            .from('exam_attempts')
+            .select('student_id, completion_seconds, violation_count')
+            .eq('exam_session_id', examSessionId)
+            .eq('status', 'completed');
+        for (final row in attemptsRaw) {
+          final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
+          attemptByStudent[_jsonStr(m['student_id'])] = m;
+        }
+      } catch (_) {}
 
       final list = rows.map((row) {
         final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
@@ -890,8 +1427,16 @@ class ExamService {
           final n = _jsonStr(students['full_name']);
           if (n.isNotEmpty) name = n;
         }
+        final sid = _jsonStr(m['student_id']);
+        final att = attemptByStudent[sid];
+        final completionSeconds =
+            (att?['completion_seconds'] as num?)?.toInt();
+        final violationCount =
+            (att?['violation_count'] as num?)?.toInt() ??
+            (m['violation_penalty'] as num?)?.toInt() ??
+            0;
         return ExamRankingRow(
-          studentId: _jsonStr(m['student_id']),
+          studentId: sid,
           studentName: name,
           examScore: (m['exam_score'] as num?)?.toDouble() ?? 0,
           speedPoints: (m['speed_points'] as num?)?.toDouble() ?? 0,
@@ -899,6 +1444,8 @@ class ExamService {
           overallScore: (m['overall_score'] as num?)?.toDouble() ?? 0,
           rankNumber: (m['rank_number'] as num?)?.toInt(),
           remarks: (m['remarks'] as String?)?.trim(),
+          completionSeconds: completionSeconds,
+          violationCount: violationCount,
         );
       }).toList();
 
@@ -908,7 +1455,13 @@ class ExamService {
         if (ar != null && br != null) return ar.compareTo(br);
         if (ar != null) return -1;
         if (br != null) return 1;
-        return b.overallScore.compareTo(a.overallScore);
+        final byScore = b.examScore.compareTo(a.examScore);
+        if (byScore != 0) return byScore;
+        final aSec = a.completionSeconds ?? 999999;
+        final bSec = b.completionSeconds ?? 999999;
+        final bySpeed = aSec.compareTo(bSec);
+        if (bySpeed != 0) return bySpeed;
+        return a.violationCount.compareTo(b.violationCount);
       });
       return list;
     } catch (e) {

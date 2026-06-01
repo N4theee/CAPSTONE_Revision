@@ -34,7 +34,104 @@ class ProximityUpdate {
   final int? rssi;
 }
 
-enum _BleScanMode { none, attendance, exam }
+/// Live debug snapshot while scanning for teacher beacon during exam join.
+class JoinProximityDebug {
+  const JoinProximityDebug({
+    this.scanning = false,
+    this.expectedUuid,
+    this.expectedBeaconName,
+    this.currentThreshold,
+    this.detectedBeaconName,
+    this.detectedServiceUuid,
+    this.foundServiceUuids = const [],
+    this.rssi,
+    this.uuidMatched = false,
+    this.nameMatched = false,
+    this.finalInRange = false,
+    this.lastSeenAt,
+    this.elapsed = Duration.zero,
+  });
+
+  final bool scanning;
+  final String? expectedUuid;
+  final String? expectedBeaconName;
+  final int? currentThreshold;
+  final String? detectedBeaconName;
+  final String? detectedServiceUuid;
+  final List<String> foundServiceUuids;
+  final int? rssi;
+  final bool uuidMatched;
+  final bool nameMatched;
+  final bool finalInRange;
+  final DateTime? lastSeenAt;
+  final Duration elapsed;
+
+  JoinProximityDebug copyWith({
+    bool? scanning,
+    String? expectedUuid,
+    String? expectedBeaconName,
+    int? currentThreshold,
+    String? detectedBeaconName,
+    String? detectedServiceUuid,
+    List<String>? foundServiceUuids,
+    int? rssi,
+    bool? uuidMatched,
+    bool? nameMatched,
+    bool? finalInRange,
+    DateTime? lastSeenAt,
+    Duration? elapsed,
+  }) {
+    return JoinProximityDebug(
+      scanning: scanning ?? this.scanning,
+      expectedUuid: expectedUuid ?? this.expectedUuid,
+      expectedBeaconName: expectedBeaconName ?? this.expectedBeaconName,
+      currentThreshold: currentThreshold ?? this.currentThreshold,
+      detectedBeaconName: detectedBeaconName ?? this.detectedBeaconName,
+      detectedServiceUuid:
+          detectedServiceUuid ?? this.detectedServiceUuid,
+      foundServiceUuids: foundServiceUuids ?? this.foundServiceUuids,
+      rssi: rssi ?? this.rssi,
+      uuidMatched: uuidMatched ?? this.uuidMatched,
+      nameMatched: nameMatched ?? this.nameMatched,
+      finalInRange: finalInRange ?? this.finalInRange,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      elapsed: elapsed ?? this.elapsed,
+    );
+  }
+}
+
+/// Exam-only beacon match (UUID and/or advertised name).
+class ExamBeaconMatch {
+  const ExamBeaconMatch({
+    required this.rssi,
+    required this.uuidMatched,
+    required this.nameMatched,
+    required this.beaconMatched,
+    this.beaconName,
+    this.matchedServiceUuid,
+    this.foundServiceUuids = const [],
+  });
+
+  final int rssi;
+  final bool uuidMatched;
+  final bool nameMatched;
+  final bool beaconMatched;
+  final String? beaconName;
+  final String? matchedServiceUuid;
+  final List<String> foundServiceUuids;
+}
+
+class JoinProximityResult {
+  const JoinProximityResult({
+    required this.success,
+    required this.debug,
+  });
+
+  final bool success;
+  final JoinProximityDebug debug;
+}
+
+enum _BleScanMode { none, attendance, exam, join }
 
 class BleService {
   static final BleService _i = BleService._();
@@ -59,10 +156,16 @@ class BleService {
   String? _targetBeaconName;
   int _rssiThreshold = AppConfig.rssiThreshold;
 
-  // Exam grace-period (same scan path as attendance; different callbacks).
+  // Exam-only state (does not affect attendance scanning).
   bool _examMonitoring = false;
   int _examGracePeriodSeconds = 30;
+  int _examProximitySmoothingSeconds = AppConfig.examProximitySmoothingSeconds;
+  DateTime? _examLastSeenInRangeAt;
+  ExamBeaconMatch? _lastExamBeaconMatch;
+  int? _examLastDetectedRssi;
   DateTime? _examOutOfRangeSince;
+
+  ExamBeaconMatch? get lastExamBeaconMatch => _lastExamBeaconMatch;
   bool _examOutOfRangeNotified = false;
   bool _examAutoEndTriggered = false;
   void Function(int rssi, bool isInRange)? _examOnReading;
@@ -76,6 +179,59 @@ class BleService {
 
   bool get isExamProximityMonitoring => _examMonitoring;
   bool get _isScanning => _scanMode != _BleScanMode.none;
+
+  static String _normStr(String? value) => value?.trim().toLowerCase() ?? '';
+
+  static String _normUuid(String value) =>
+      _normStr(value).replaceAll('-', '');
+
+  static bool _uuidEquals(String a, String b) =>
+      _normUuid(a).isNotEmpty && _normUuid(a) == _normUuid(b);
+
+  /// Returns null when permissions are OK; otherwise a user-visible message.
+  Future<String?> examBlePermissionIssue() async {
+    if (kIsWeb) {
+      return 'BLE is not supported in the browser. Use the Android or iOS app.';
+    }
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      final r = await [
+        Permission.bluetooth,
+        Permission.locationWhenInUse,
+      ].request();
+      final ok = r.values.every((s) => s == PermissionStatus.granted);
+      return ok ? null : 'Bluetooth and location permissions are required.';
+    }
+
+    final sdk = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+    if (sdk >= 31) {
+      final statuses = await [
+        Permission.bluetoothScan,
+        Permission.bluetoothAdvertise,
+        Permission.bluetoothConnect,
+        Permission.locationWhenInUse,
+      ].request();
+      for (final e in statuses.entries) {
+        if (e.value == PermissionStatus.permanentlyDenied) {
+          return 'Enable ${e.key.toString().split('.').last} in Settings, then retry.';
+        }
+      }
+      final ok = statuses.values.every(
+        (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
+      );
+      return ok
+          ? null
+          : 'Bluetooth scan, connect, advertise, and location are required.';
+    }
+
+    final results = await [
+      Permission.bluetooth,
+      Permission.locationWhenInUse,
+    ].request();
+    final ok = results.values.every(
+      (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
+    );
+    return ok ? null : 'Bluetooth and location permissions are required.';
+  }
 
   Future<String> getOrCreateDeviceUuid() async {
     final prefs = await SharedPreferences.getInstance();
@@ -302,8 +458,12 @@ class BleService {
     }
   }
 
-  /// Evaluates scan results — identical rules for attendance and exam.
+  /// Evaluates scan results for attendance (unchanged) or exam (smoothed).
   ProximityUpdate _evaluateScanResults(List<ScanResult> results) {
+    if (_scanMode == _BleScanMode.exam) {
+      return _evaluateExamProximityResults(results);
+    }
+
     var found = false;
     int? bestRssi;
 
@@ -326,7 +486,98 @@ class BleService {
     return ProximityUpdate(inRange: found, rssi: bestRssi);
   }
 
-  /// Returns RSSI if this advertisement matches target UUID or name.
+  ProximityUpdate _evaluateExamProximityResults(List<ScanResult> results) {
+    var signalInRange = false;
+    int? bestRssi;
+
+    for (final r in results) {
+      final match = _examBeaconMatchFromResult(r);
+      if (match == null || !match.beaconMatched) continue;
+
+      _lastExamBeaconMatch = match;
+      if (bestRssi == null || match.rssi > bestRssi) {
+        bestRssi = match.rssi;
+      }
+
+      final detectedRssi = match.rssi;
+      final rssiThreshold = _rssiThreshold;
+      final inRangeNow = detectedRssi >= rssiThreshold;
+      debugPrint('[EXAM BLE] session threshold: $rssiThreshold');
+      debugPrint('[EXAM BLE] detected RSSI: $detectedRssi');
+      debugPrint('[EXAM BLE] in range: $inRangeNow');
+
+      if (inRangeNow) {
+        signalInRange = true;
+      }
+    }
+
+    if (signalInRange) {
+      _examLastSeenInRangeAt = DateTime.now();
+    }
+    if (bestRssi != null) {
+      _examLastDetectedRssi = bestRssi;
+    }
+
+    final isInRange = signalInRange ||
+        (_examLastSeenInRangeAt != null &&
+            DateTime.now().difference(_examLastSeenInRangeAt!).inSeconds <
+                _examProximitySmoothingSeconds);
+
+    return ProximityUpdate(
+      inRange: isInRange,
+      rssi: bestRssi ?? _examLastDetectedRssi,
+    );
+  }
+
+  /// Exam join + monitor: UUID match OR beacon name fallback (Android).
+  ExamBeaconMatch? _examBeaconMatchFromResult(ScanResult r) {
+    final expectedUuid = _targetBeaconUuid;
+    if (expectedUuid == null || expectedUuid.isEmpty) return null;
+
+    final platformName = _normStr(r.device.platformName);
+    final advName = _normStr(r.advertisementData.advName);
+    final displayName = platformName.isNotEmpty
+        ? platformName
+        : (advName.isNotEmpty ? advName : null);
+
+    final foundUuids = r.advertisementData.serviceUuids
+        .map((id) => id.str.trim().toLowerCase())
+        .toList();
+
+    final uuidMatched = foundUuids.any((u) => _uuidEquals(u, expectedUuid));
+
+    final beaconName = _targetBeaconName;
+    final shortBeaconName = beaconName != null && beaconName.length > 8
+        ? beaconName.substring(0, 8)
+        : beaconName;
+    final nameMatched = beaconName != null &&
+        beaconName.isNotEmpty &&
+        (platformName == beaconName ||
+            advName == beaconName ||
+            (shortBeaconName != null &&
+                (platformName == shortBeaconName ||
+                    advName == shortBeaconName)));
+
+    final beaconMatched = uuidMatched || nameMatched;
+    if (!beaconMatched) return null;
+
+    String? matchedUuid;
+    if (uuidMatched) {
+      matchedUuid = foundUuids.firstWhere((u) => _uuidEquals(u, expectedUuid));
+    }
+
+    return ExamBeaconMatch(
+      rssi: r.rssi,
+      uuidMatched: uuidMatched,
+      nameMatched: nameMatched,
+      beaconMatched: true,
+      beaconName: displayName,
+      matchedServiceUuid: matchedUuid,
+      foundServiceUuids: foundUuids,
+    );
+  }
+
+  /// Returns RSSI if this advertisement matches target UUID or name (attendance only).
   ({int rssi})? _beaconSampleFromResult(ScanResult r) {
     final uuid = _targetBeaconUuid;
     if (uuid == null || uuid.isEmpty) return null;
@@ -403,12 +654,233 @@ class BleService {
     _stopContinuousProximityScan();
   }
 
-  // ── EXAM PROXIMITY (same scan; grace-period on out-of-range) ─────────────
+  // ── EXAM BLE (join scan, monitor, teacher beacon) ─────────────────────────
+
+  Timer? _joinScanTimer;
+  Completer<JoinProximityResult>? _joinScanCompleter;
+
+  void _cleanupJoinScan({bool completeAsFailure = false}) {
+    _joinScanTimer?.cancel();
+    _joinScanTimer = null;
+    if (completeAsFailure &&
+        _joinScanCompleter != null &&
+        !_joinScanCompleter!.isCompleted) {
+      _joinScanCompleter!.complete(
+        JoinProximityResult(
+          success: false,
+          debug: _lastJoinDebug.copyWith(scanning: false),
+        ),
+      );
+    }
+    _joinScanCompleter = null;
+    if (_scanMode == _BleScanMode.join) {
+      _scanMode = _BleScanMode.none;
+    }
+    _resultSub?.cancel();
+    _resultSub = null;
+    FlutterBluePlus.stopScan();
+    _lastProximity = const ProximityUpdate(inRange: false, rssi: null);
+  }
+
+  void stopJoinProximityScan() {
+    if (_scanMode != _BleScanMode.join && _joinScanCompleter == null) return;
+    debugPrint('[BLE] Stopping exam join proximity scan');
+    _cleanupJoinScan(completeAsFailure: true);
+  }
+
+  /// Stops exam join scan, continuous exam monitor, and exam beacon advertising.
+  Future<void> stopExamBle() async {
+    stopJoinProximityScan();
+    stopExamProximityMonitoring();
+    await stopExamBeaconAdvertising();
+  }
+
+  JoinProximityDebug _lastJoinDebug = const JoinProximityDebug();
+
+  Future<JoinProximityResult> scanForExamBeacon({
+    required String expectedBeaconUuid,
+    String? beaconName,
+    required int rssiThreshold,
+    Duration timeout = const Duration(seconds: AppConfig.examJoinScanTimeoutSeconds),
+    void Function(JoinProximityDebug debug)? onProgress,
+  }) =>
+      checkTeacherProximityWithTimeout(
+        expectedBeaconUuid: expectedBeaconUuid,
+        beaconName: beaconName,
+        rssiThreshold: rssiThreshold,
+        timeout: timeout,
+        onProgress: onProgress,
+      );
+
+  /// Scans up to [timeout] for teacher exam beacon (UUID or name) + RSSI.
+  Future<JoinProximityResult> checkTeacherProximityWithTimeout({
+    required String expectedBeaconUuid,
+    String? beaconName,
+    required int rssiThreshold,
+    Duration timeout = const Duration(seconds: AppConfig.examJoinScanTimeoutSeconds),
+    void Function(JoinProximityDebug debug)? onProgress,
+  }) async {
+    stopJoinProximityScan();
+    if (_examMonitoring) stopExamProximityMonitoring();
+    if (_scanMode == _BleScanMode.attendance) stopProximityScanning();
+
+    final btOn = await isBluetoothOn();
+    if (!btOn) {
+      const debug = JoinProximityDebug(scanning: false);
+      return const JoinProximityResult(success: false, debug: debug);
+    }
+
+    final targetUuid = expectedBeaconUuid.trim().toLowerCase();
+    if (targetUuid.isEmpty) {
+      return const JoinProximityResult(
+        success: false,
+        debug: JoinProximityDebug(scanning: false),
+      );
+    }
+
+    _scanMode = _BleScanMode.join;
+    _targetBeaconUuid = targetUuid;
+    _targetBeaconName = beaconName?.trim().toLowerCase();
+    _rssiThreshold = rssiThreshold;
+
+    final expectedName = _targetBeaconName;
+    debugPrint('[STUDENT EXAM BLE] expected uuid: $targetUuid');
+    debugPrint('[STUDENT EXAM BLE] expected beacon name: $expectedName');
+
+    final stopwatch = Stopwatch()..start();
+    _lastJoinDebug = JoinProximityDebug(
+      scanning: true,
+      expectedUuid: targetUuid,
+      expectedBeaconName: expectedName,
+      currentThreshold: rssiThreshold,
+    );
+    onProgress?.call(_lastJoinDebug);
+
+    _joinScanCompleter = Completer<JoinProximityResult>();
+    final resultFuture = _joinScanCompleter!.future;
+
+    void emitProgress(JoinProximityDebug d) {
+      _lastJoinDebug = d;
+      onProgress?.call(d);
+    }
+
+    void finish(bool success) {
+      final completer = _joinScanCompleter;
+      if (completer == null || completer.isCompleted) return;
+      emitProgress(
+        _lastJoinDebug.copyWith(
+          scanning: false,
+          elapsed: stopwatch.elapsed,
+        ),
+      );
+      completer.complete(
+        JoinProximityResult(success: success, debug: _lastJoinDebug),
+      );
+      _cleanupJoinScan();
+    }
+
+    _resultSub?.cancel();
+    _resultSub = FlutterBluePlus.onScanResults.listen(
+      (results) {
+        if (_scanMode != _BleScanMode.join) return;
+
+        for (final r in results) {
+          final match = _examBeaconMatchFromResult(r);
+          if (match == null) continue;
+
+          final detectedRssi = match.rssi;
+          final inRangeNow = detectedRssi >= _rssiThreshold;
+          debugPrint(
+            '[STUDENT EXAM BLE] found service UUIDs: ${match.foundServiceUuids}',
+          );
+          debugPrint('[STUDENT EXAM BLE] uuid matched: ${match.uuidMatched}');
+          debugPrint('[STUDENT EXAM BLE] name matched: ${match.nameMatched}');
+          debugPrint('[EXAM BLE] session threshold: $_rssiThreshold');
+          debugPrint('[EXAM BLE] detected RSSI: $detectedRssi');
+          debugPrint('[EXAM BLE] in range: $inRangeNow');
+
+          emitProgress(
+            JoinProximityDebug(
+              scanning: true,
+              expectedUuid: targetUuid,
+              expectedBeaconName: expectedName,
+              currentThreshold: _rssiThreshold,
+              detectedBeaconName: match.beaconName,
+              detectedServiceUuid: match.matchedServiceUuid,
+              foundServiceUuids: match.foundServiceUuids,
+              rssi: detectedRssi,
+              uuidMatched: match.uuidMatched,
+              nameMatched: match.nameMatched,
+              finalInRange: inRangeNow,
+              lastSeenAt: inRangeNow ? DateTime.now() : _lastJoinDebug.lastSeenAt,
+              elapsed: stopwatch.elapsed,
+            ),
+          );
+
+          if (match.beaconMatched && inRangeNow) {
+            debugPrint(
+              '[BLE] ✅ Join proximity OK RSSI=$detectedRssi UUID=$targetUuid',
+            );
+            finish(true);
+            return;
+          }
+        }
+      },
+      onError: (e) => debugPrint('[BLE] Join scan error: $e'),
+    );
+
+    try {
+      await FlutterBluePlus.stopScan();
+      await Future.delayed(const Duration(milliseconds: 200));
+      await FlutterBluePlus.startScan(
+        timeout: timeout,
+        continuousUpdates: true,
+        androidUsesFineLocation: true,
+      );
+      debugPrint('[BLE] Join scan started (${timeout.inSeconds}s max)');
+    } catch (e) {
+      debugPrint('[BLE] Join startScan failed: $e');
+      finish(false);
+    }
+
+    _joinScanTimer = Timer(timeout, () {
+      debugPrint('[BLE] Join scan timed out after ${timeout.inSeconds}s');
+      finish(false);
+    });
+
+    return resultFuture;
+  }
+
+  // ── EXAM PROXIMITY (continuous scan + 5s smoothing + grace auto-end) ─────
+
+  Future<void> monitorExamProximity({
+    required String expectedBleUuid,
+    int? rssiThreshold,
+    int? gracePeriodSeconds,
+    int? smoothingSeconds,
+    String? beaconName,
+    required void Function(int rssi, bool isInRange) onReading,
+    required void Function() onOutOfRange,
+    required void Function() onReturnedInRange,
+    required void Function() onAutoEndRequired,
+  }) =>
+      startExamProximityMonitoring(
+        expectedBleUuid: expectedBleUuid,
+        rssiThreshold: rssiThreshold,
+        gracePeriodSeconds: gracePeriodSeconds,
+        smoothingSeconds: smoothingSeconds,
+        beaconName: beaconName,
+        onReading: onReading,
+        onOutOfRange: onOutOfRange,
+        onReturnedInRange: onReturnedInRange,
+        onAutoEndRequired: onAutoEndRequired,
+      );
 
   Future<void> startExamProximityMonitoring({
     required String expectedBleUuid,
     int? rssiThreshold,
     int? gracePeriodSeconds,
+    int? smoothingSeconds,
     String? beaconName,
     required void Function(int rssi, bool isInRange) onReading,
     required void Function() onOutOfRange,
@@ -426,6 +898,11 @@ class BleService {
 
     _examMonitoring = true;
     _examGracePeriodSeconds = gracePeriodSeconds ?? 30;
+    _examProximitySmoothingSeconds =
+        smoothingSeconds ?? AppConfig.examProximitySmoothingSeconds;
+    _examLastSeenInRangeAt = null;
+    _examLastDetectedRssi = null;
+    _lastExamBeaconMatch = null;
     _examOnReading = onReading;
     _examOnOutOfRange = onOutOfRange;
     _examOnReturnedInRange = onReturnedInRange;
@@ -434,11 +911,16 @@ class BleService {
     _examOutOfRangeNotified = false;
     _examAutoEndTriggered = false;
 
+    final threshold = rssiThreshold ?? AppConfig.rssiThreshold;
+    debugPrint('[STUDENT EXAM BLE] expected uuid: ${expectedBleUuid.trim().toLowerCase()}');
+    debugPrint('[STUDENT EXAM BLE] expected beacon name: ${beaconName?.trim().toLowerCase()}');
+    debugPrint('[EXAM BLE] session threshold: $threshold');
+
     await _startContinuousProximityScan(
       mode: _BleScanMode.exam,
       beaconUuid: expectedBleUuid,
       beaconName: beaconName,
-      rssiThreshold: rssiThreshold,
+      rssiThreshold: threshold,
     );
 
     // Emit current state immediately (same as attendance stream consumers expect).
@@ -459,6 +941,9 @@ class BleService {
     _examOnOutOfRange = null;
     _examOnReturnedInRange = null;
     _examOnAutoEndRequired = null;
+    _examLastSeenInRangeAt = null;
+    _examLastDetectedRssi = null;
+    _lastExamBeaconMatch = null;
     if (_scanMode == _BleScanMode.exam) {
       _stopContinuousProximityScan();
     }
@@ -497,13 +982,26 @@ class BleService {
   }
 
   void dispose() {
+    stopJoinProximityScan();
     stopExamProximityMonitoring();
     stopProximityScanning();
     _proximityCtrl.close();
     _proximityDetailCtrl.close();
   }
 
-  // ── TEACHER BEACON ADVERTISING ──────────────────────────────────────
+  // ── TEACHER BEACON ADVERTISING (attendance + exam) ────────────────────
+
+  Future<void> startExamBeaconAdvertising({
+    required String bleUuid,
+    required String beaconName,
+  }) async {
+    debugPrint('[TEACHER EXAM BLE] advertising uuid: $bleUuid');
+    debugPrint('[TEACHER EXAM BLE] beacon name: $beaconName');
+    await startTeacherBeacon(beaconUuid: bleUuid, localName: beaconName);
+  }
+
+  Future<void> stopExamBeaconAdvertising() => stopTeacherBeacon();
+
   Future<void> startTeacherBeacon({
     required String beaconUuid,
     required String localName,

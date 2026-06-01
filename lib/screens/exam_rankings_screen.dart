@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
@@ -232,18 +231,24 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Exam ${r.examScore.toStringAsFixed(1)} • '
-                        'Speed ${r.speedPoints.toStringAsFixed(1)} • '
-                        'Penalty ${r.violationPenalty.toStringAsFixed(1)}'
+                        'Score ${r.examScore.toStringAsFixed(1)}% • '
+                        'Time ${ExamService.formatCompletionTime(r.completionSeconds)} • '
+                        'Violations ${r.violationCount}'
                         '${r.remarks != null && r.remarks!.isNotEmpty ? '\n${r.remarks}' : ''}',
                       ),
-                      trailing: Text(
-                        r.overallScore.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                          color: TeacherAttendanceUi.accentPurple,
-                        ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${r.examScore.toStringAsFixed(1)}%',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: TeacherAttendanceUi.accentPurple,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +8,14 @@ import '../services/supabase_service.dart';
 import '../ui/responsive.dart';
 import '../ui/student_attendance_ui.dart';
 import 'student_exam_monitoring_screen.dart';
+
+enum _JoinLoadState {
+  idle,
+  validatingCode,
+  checkingProximity,
+  proximityFailed,
+  proximityPassed,
+}
 
 class JoinExamScreen extends StatefulWidget {
   const JoinExamScreen({
@@ -32,17 +38,21 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
   final _ble = BleService();
   final _codeCtrl = TextEditingController();
 
-  bool _joining = false;
+  _JoinLoadState _loadState = _JoinLoadState.idle;
   String? _statusLine;
-  StreamSubscription<bool>? _proximitySub;
+  ExamSession? _validatedSession;
+  JoinProximityDebug _proximityDebug = const JoinProximityDebug();
 
   @override
   void dispose() {
-    _proximitySub?.cancel();
-    _ble.stopProximityScanning();
+    _ble.stopJoinProximityScan();
     _codeCtrl.dispose();
     super.dispose();
   }
+
+  bool get _busy =>
+      _loadState == _JoinLoadState.validatingCode ||
+      _loadState == _JoinLoadState.checkingProximity;
 
   String _beaconAdvertisedName() {
     final configured = widget.offering.beaconName.trim();
@@ -56,142 +66,204 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _joinExam() async {
+  Future<ExamSession> validateExamCode() async {
     final code = ExamService.normalizeExamCode(_codeCtrl.text);
     if (code.isEmpty) {
-      _toast('Enter the exam code from your teacher.');
+      throw ExamServiceException('Enter the exam code from your teacher.');
+    }
+    return _exam.validateExamCode(
+      examCode: code,
+      subjectOfferingId: widget.offering.id,
+    );
+  }
+
+  Future<void> _ensureEnrollmentAndAttemptRules(ExamSession session) async {
+    final enrolled = await _exam.isStudentEnrolledInOffering(
+      widget.studentId,
+      widget.offering.id,
+    );
+    if (!enrolled) {
+      throw ExamServiceException(
+        'You are not enrolled in this subject offering.',
+      );
+    }
+
+    final attempt = await _exam.getStudentExamAttempt(
+      examSessionId: session.id,
+      studentId: widget.studentId,
+    );
+    if (attempt != null && attempt.isTerminal) {
+      throw ExamServiceException(
+        'You already finished this exam (${attempt.status}).',
+      );
+    }
+
+    if (attempt != null && attempt.status == 'in_progress') {
+      if (!mounted) return;
+      setState(() => _loadState = _JoinLoadState.idle);
+      _navigateToMonitor(session: session, attempt: attempt);
+      throw _ResumeExistingAttempt();
+    }
+  }
+
+  Future<bool> checkTeacherProximityWithTimeout(ExamSession session) async {
+    final beaconUuid = ExamService.resolveBeaconUuid(
+      session: session,
+      offeringBeaconUuid: widget.offering.beaconUuid,
+    );
+    if (beaconUuid.isEmpty) {
+      throw Exception(
+        'This class has no BLE beacon UUID. Ask your teacher to start the exam '
+        'from a device with Bluetooth advertising enabled.',
+      );
+    }
+
+    final permissionIssue = await _ble.examBlePermissionIssue();
+    if (permissionIssue != null) {
+      throw Exception(permissionIssue);
+    }
+    final btOn = await _ble.isBluetoothOn();
+    if (!btOn) {
+      throw Exception('Please turn on Bluetooth first.');
+    }
+
+    final rssi = ExamService.examJoinProximityRssi(session.rssiThreshold);
+    final timeout = Duration(seconds: AppConfig.examJoinScanTimeoutSeconds);
+
+    final result = await _ble.scanForExamBeacon(
+      expectedBeaconUuid: beaconUuid,
+      beaconName: _beaconAdvertisedName(),
+      rssiThreshold: rssi,
+      timeout: timeout,
+      onProgress: (debug) {
+        if (!mounted) return;
+        setState(() => _proximityDebug = debug);
+      },
+    );
+
+    if (!mounted) return false;
+    setState(() => _proximityDebug = result.debug);
+    return result.success;
+  }
+
+  Future<void> proceedToExam(ExamSession session) async {
+    final existing = await _exam.getStudentExamAttempt(
+      examSessionId: session.id,
+      studentId: widget.studentId,
+    );
+    if (existing != null && existing.status == 'in_progress') {
+      if (!mounted) return;
+      setState(() {
+        _loadState = _JoinLoadState.proximityPassed;
+        _statusLine = null;
+      });
+      _navigateToMonitor(session: session, attempt: existing);
       return;
     }
 
+    final attempt = await _exam.createExamAttempt(
+      examSessionId: session.id,
+      studentId: widget.studentId,
+    );
+    if (!mounted) return;
     setState(() {
-      _joining = true;
+      _loadState = _JoinLoadState.proximityPassed;
+      _statusLine = null;
+    });
+    _navigateToMonitor(session: session, attempt: attempt);
+  }
+
+  void showRetryState() {
+    if (!mounted) return;
+    setState(() {
+      _loadState = _JoinLoadState.proximityFailed;
+      _statusLine =
+          'Teacher device not detected. Please stay near the teacher and tap Retry.';
+    });
+  }
+
+  Future<void> _joinExam() async {
+    if (_busy) return;
+
+    setState(() {
+      _loadState = _JoinLoadState.validatingCode;
       _statusLine = 'Validating exam code…';
+      _proximityDebug = const JoinProximityDebug();
+      _validatedSession = null;
     });
 
     try {
-      final session = await _exam.validateExamCode(
-        examCode: code,
-        subjectOfferingId: widget.offering.id,
-      );
+      final session = await validateExamCode();
+      await _ensureEnrollmentAndAttemptRules(session);
 
-      final enrolled = await _exam.isStudentEnrolledInOffering(
-        widget.studentId,
-        widget.offering.id,
-      );
-      if (!enrolled) {
-        throw ExamServiceException(
-          'You are not enrolled in this subject offering.',
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _validatedSession = session;
+        _loadState = _JoinLoadState.checkingProximity;
+        _statusLine =
+            'Exam code accepted. Checking teacher proximity…';
+      });
 
-      var attempt = await _exam.getStudentExamAttempt(
-        examSessionId: session.id,
-        studentId: widget.studentId,
-      );
-      if (attempt != null && attempt.isTerminal) {
-        throw ExamServiceException(
-          'You already finished this exam (${attempt.status}).',
-        );
-      }
+      final inRange = await checkTeacherProximityWithTimeout(session);
+      if (!mounted) return;
 
-      if (attempt != null && attempt.status == 'in_progress') {
-        if (!mounted) return;
-        setState(() => _joining = false);
-        _navigateToMonitor(session: session, attempt: attempt);
+      if (!inRange) {
+        showRetryState();
         return;
       }
 
-      setState(() => _statusLine = 'Checking Bluetooth permissions…');
-      final granted = await _ble.requestPermissions();
-      if (!granted) {
-        throw Exception('Bluetooth and location permissions are required.');
-      }
-      final btOn = await _ble.isBluetoothOn();
-      if (!btOn) {
-        throw Exception('Please turn on Bluetooth first.');
-      }
-
-      final beaconUuid = ExamService.resolveBeaconUuid(
-        session: session,
-        offeringBeaconUuid: widget.offering.beaconUuid,
-      );
-      if (beaconUuid.isEmpty) {
-        throw Exception(
-          'This class has no BLE beacon UUID. Ask your teacher to start the exam '
-          'from a device with Bluetooth advertising enabled.',
-        );
-      }
-
-      final rssi = ExamService.effectiveProximityRssi(session.rssiThreshold);
-
-      setState(() => _statusLine = 'Scanning for teacher beacon…');
-      await _ble.startProximityScanning(
-        beaconUuid,
-        beaconName: _beaconAdvertisedName(),
-        rssiThreshold: rssi,
-      );
-
-      final inRange = await _waitForInRange(timeout: const Duration(seconds: 60));
-      if (!inRange) {
-        _ble.stopProximityScanning();
-        throw Exception(
-          'Could not detect the teacher beacon. Ask your teacher to open the active exam '
-          '(BLE beacon must be on), move closer, and keep Bluetooth and Location enabled.',
-        );
-      }
-
-      setState(() => _statusLine = 'Starting exam attempt…');
-      attempt = await _exam.createExamAttempt(
-        examSessionId: session.id,
-        studentId: widget.studentId,
-      );
-
-      if (!mounted) return;
-      setState(() => _joining = false);
-      _navigateToMonitor(session: session, attempt: attempt);
+      await proceedToExam(session);
+    } on _ResumeExistingAttempt {
+      // Navigation already handled.
     } on ExamServiceException catch (e) {
-      _ble.stopProximityScanning();
+      _ble.stopJoinProximityScan();
       if (!mounted) return;
       setState(() {
-        _joining = false;
+        _loadState = _JoinLoadState.idle;
         _statusLine = null;
       });
       _toast(e.message);
     } catch (e) {
-      _ble.stopProximityScanning();
+      _ble.stopJoinProximityScan();
       if (!mounted) return;
       setState(() {
-        _joining = false;
+        _loadState = _JoinLoadState.idle;
         _statusLine = null;
       });
       _toast(e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
-  Future<bool> _waitForInRange({required Duration timeout}) async {
-    final deadline = DateTime.now().add(timeout);
-    var inStreak = _ble.lastProximity.inRange ? 1 : 0;
-    if (inStreak >= AppConfig.examJoinInRangeStreakRequired) return true;
+  Future<void> _retryProximityCheck() async {
+    final session = _validatedSession;
+    if (session == null || _busy) return;
 
-    _proximitySub?.cancel();
-    _proximitySub = _ble.proximityStream.listen((inRange) {
-      if (inRange) {
-        inStreak++;
-      } else {
-        inStreak = 0;
-      }
+    setState(() {
+      _loadState = _JoinLoadState.checkingProximity;
+      _statusLine = 'Checking teacher proximity…';
+      _proximityDebug = const JoinProximityDebug();
     });
 
-    while (DateTime.now().isBefore(deadline)) {
-      if (inStreak >= AppConfig.examJoinInRangeStreakRequired) {
-        await _proximitySub?.cancel();
-        return true;
-      }
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
+    try {
+      final inRange = await checkTeacherProximityWithTimeout(session);
+      if (!mounted) return;
 
-    await _proximitySub?.cancel();
-    return inStreak >= AppConfig.examJoinInRangeStreakRequired;
+      if (!inRange) {
+        showRetryState();
+        return;
+      }
+
+      await proceedToExam(session);
+    } catch (e) {
+      _ble.stopJoinProximityScan();
+      if (!mounted) return;
+      setState(() {
+        _loadState = _JoinLoadState.proximityFailed;
+        _statusLine =
+            'Teacher device not detected. Please stay near the teacher and tap Retry.';
+      });
+      _toast(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   void _navigateToMonitor({
@@ -212,9 +284,103 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
     );
   }
 
+  Widget _debugPanel() {
+    if (!AppConfig.showExamBleDebugPanel) return const SizedBox.shrink();
+    if (_loadState != _JoinLoadState.checkingProximity &&
+        _loadState != _JoinLoadState.proximityFailed) {
+      return const SizedBox.shrink();
+    }
+
+    final d = _proximityDebug;
+    final session = _validatedSession;
+    final expectedUuid = session != null
+        ? ExamService.resolveBeaconUuid(
+            session: session,
+            offeringBeaconUuid: widget.offering.beaconUuid,
+          )
+        : (d.expectedUuid ?? '—');
+    return Card(
+      color: StudentAttendanceUi.surface.withValues(alpha: 0.6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'BLE debug (dev)',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: StudentAttendanceUi.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _debugRow('Expected UUID', expectedUuid),
+            _debugRow(
+              'Expected beacon name',
+              d.expectedBeaconName ?? _beaconAdvertisedName(),
+            ),
+            _debugRow(
+              'Current threshold',
+              d.currentThreshold?.toString() ??
+                  ExamService.examJoinProximityRssi(
+                    session?.rssiThreshold ?? AppConfig.examJoinRssiThreshold,
+                  ).toString(),
+            ),
+            _debugRow('Last detected RSSI', d.rssi?.toString() ?? '—'),
+            _debugRow(
+              'Found UUIDs',
+              d.foundServiceUuids.isEmpty
+                  ? '—'
+                  : d.foundServiceUuids.join(', '),
+            ),
+            _debugRow('Found beacon name', d.detectedBeaconName ?? '—'),
+            _debugRow('UUID matched', d.uuidMatched ? 'true' : 'false'),
+            _debugRow('Name matched', d.nameMatched ? 'true' : 'false'),
+            _debugRow('Final inRange', d.finalInRange ? 'true' : 'false'),
+            _debugRow(
+              'Last seen',
+              d.lastSeenAt?.toIso8601String() ?? '—',
+            ),
+            _debugRow('Scanning', d.scanning ? 'yes' : 'no'),
+            _debugRow('Elapsed', '${d.elapsed.inMilliseconds} ms'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _debugRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                color: StudentAttendanceUi.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hPad = AppBreakpoints.horizontalPadding(context);
+    final showRetry = _loadState == _JoinLoadState.proximityFailed;
 
     return Theme(
       data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
@@ -238,6 +404,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
             const SizedBox(height: 24),
             TextField(
               controller: _codeCtrl,
+              enabled: !_busy,
               style: StudentAttendanceUi.fieldTextStyle(),
               cursorColor: StudentAttendanceUi.mint,
               textCapitalization: TextCapitalization.characters,
@@ -251,7 +418,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            if (_joining) ...[
+            if (_busy) ...[
               const Center(child: CircularProgressIndicator()),
               const SizedBox(height: 12),
               if (_statusLine != null)
@@ -262,6 +429,40 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
                     color: StudentAttendanceUi.textSecondary,
                   ),
                 ),
+            ] else if (showRetry) ...[
+              Icon(
+                Icons.bluetooth_searching,
+                size: 48,
+                color: StudentAttendanceUi.textOnField.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _statusLine ?? '',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: StudentAttendanceUi.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _retryProximityCheck,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Retry Proximity Check'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _loadState = _JoinLoadState.idle;
+                    _statusLine = null;
+                    _validatedSession = null;
+                  });
+                },
+                child: const Text('Change exam code'),
+              ),
             ] else
               FilledButton(
                 onPressed: _joinExam,
@@ -270,10 +471,13 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
                   child: Text('Join exam'),
                 ),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            _debugPanel(),
+            const SizedBox(height: 8),
             Text(
               'Your teacher must open the active exam on their phone (beacon on). '
-              'You must be in BLE range before joining. Keep Bluetooth and Location on.',
+              'After the code is accepted, we scan for up to '
+              '${AppConfig.examJoinScanTimeoutSeconds} seconds. Keep Bluetooth and Location on.',
               style: TextStyle(
                 color: StudentAttendanceUi.textOnField,
                 fontSize: 13,
@@ -286,3 +490,6 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
     );
   }
 }
+
+/// Sentinel: student already has an in-progress attempt; navigated away.
+class _ResumeExistingAttempt implements Exception {}

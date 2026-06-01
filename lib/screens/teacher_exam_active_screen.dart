@@ -46,7 +46,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
 
   @override
   void dispose() {
-    _ble.stopTeacherBeacon();
+    unawaited(_ble.stopExamBeaconAdvertising());
     super.dispose();
   }
 
@@ -67,18 +67,29 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
 
   Future<void> _ensureBeacon() async {
     final uuid = _beaconUuid;
-    if (uuid.isEmpty) return;
+    if (uuid.isEmpty) {
+      if (mounted) setState(() => _beaconOn = false);
+      return;
+    }
     try {
-      final granted = await _ble.requestPermissions();
-      if (!granted) return;
-      if (!await _ble.isBluetoothOn()) return;
-      await _ble.startTeacherBeacon(
-        beaconUuid: uuid,
-        localName: _beaconAdvertisedName(),
+      final permissionIssue = await _ble.examBlePermissionIssue();
+      if (permissionIssue != null) {
+        debugPrint('[exam] beacon permissions: $permissionIssue');
+        if (mounted) setState(() => _beaconOn = false);
+        return;
+      }
+      if (!await _ble.isBluetoothOn()) {
+        if (mounted) setState(() => _beaconOn = false);
+        return;
+      }
+      await _ble.startExamBeaconAdvertising(
+        bleUuid: uuid,
+        beaconName: _beaconAdvertisedName(),
       );
       if (mounted) setState(() => _beaconOn = true);
     } catch (e) {
       debugPrint('[exam] teacher beacon: $e');
+      if (mounted) setState(() => _beaconOn = false);
     }
   }
 
@@ -169,29 +180,44 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
     return Theme(
       data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Active Exam Session')),
+        appBar: AppBar(title: const Text('Exam Active')),
         body: _busy
             ? const Center(child: CircularProgressIndicator())
             : ListView(
                 padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
                 children: [
-                  if (_beaconOn && canJoin)
-                    Card(
-                      color: TeacherAttendanceUi.presentGreen.withValues(alpha: 0.12),
-                      child: const ListTile(
-                        leading: Icon(Icons.bluetooth_connected,
-                            color: TeacherAttendanceUi.presentGreen),
-                        title: Text(
-                          'BLE beacon broadcasting',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                  Card(
+                    color: canJoin
+                        ? TeacherAttendanceUi.presentGreen.withValues(alpha: 0.12)
+                        : TeacherAttendanceUi.textSecondary.withValues(alpha: 0.08),
+                    child: ListTile(
+                      leading: Icon(
+                        _beaconOn ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                        color: _beaconOn
+                            ? TeacherAttendanceUi.presentGreen
+                            : TeacherAttendanceUi.absentOrange,
+                      ),
+                      title: const Text(
+                        'Exam Active',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
+                      subtitle: Text(
+                        'BLE Broadcasting: ${_beaconOn ? 'ON' : 'OFF'}',
+                        style: const TextStyle(
+                          color: TeacherAttendanceUi.textOnField,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
-                        subtitle: Text(
-                          'Students can detect your device for join and proximity.',
-                          style: TextStyle(
-                            color: TeacherAttendanceUi.textOnField,
-                            fontSize: 12,
-                          ),
-                        ),
+                      ),
+                    ),
+                  ),
+                  if (!_beaconOn && canJoin && _beaconUuid.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: OutlinedButton.icon(
+                        onPressed: _ensureBeacon,
+                        icon: const Icon(Icons.bluetooth_searching),
+                        label: const Text('Start BLE broadcasting'),
                       ),
                     ),
                   if (_beaconUuid.isEmpty)
@@ -227,7 +253,23 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                               color: TeacherAttendanceUi.textSecondary,
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
+                          _DetailRow(
+                            label: 'Advertising UUID',
+                            value: _beaconUuid.isEmpty ? '—' : _beaconUuid,
+                            mono: true,
+                          ),
+                          const SizedBox(height: 8),
+                          _DetailRow(
+                            label: 'Beacon name',
+                            value: _beaconAdvertisedName(),
+                          ),
+                          const SizedBox(height: 8),
+                          _DetailRow(
+                            label: 'RSSI threshold',
+                            value: '${_session.rssiThreshold} dBm',
+                          ),
+                          const SizedBox(height: 8),
                           const Text(
                             'Exam code',
                             style: TextStyle(
@@ -270,16 +312,18 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                   _DetailRow(label: 'Starts', value: _fmt(_session.startsAt)),
                   _DetailRow(label: 'Ends', value: _fmt(_session.endsAt)),
                   _DetailRow(
-                    label: 'RSSI threshold',
+                    label: 'RSSI (monitor)',
+                    value: '${_session.rssiThreshold} dBm',
+                  ),
+                  _DetailRow(
+                    label: 'RSSI (student join)',
                     value:
-                        '${ExamService.effectiveProximityRssi(_session.rssiThreshold)} '
-                        '(exam ${ _session.rssiThreshold})',
+                        '${ExamService.examJoinProximityRssi(_session.rssiThreshold)} dBm',
                   ),
                   _DetailRow(
                     label: 'Grace period',
                     value: '${_session.gracePeriodSeconds}s',
                   ),
-                  _DetailRow(label: 'BLE UUID', value: _beaconUuid, mono: true),
                   _DetailRow(label: 'Created', value: _fmt(_session.createdAt)),
                   const SizedBox(height: 20),
                   if (_session.status == 'scheduled') ...[
@@ -353,7 +397,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                         confirmLabel: 'End exam',
                         action: () async {
                           await _exam.endExamSession(_session.id);
-                          await _ble.stopTeacherBeacon();
+                          await _ble.stopExamBeaconAdvertising();
                           if (mounted) setState(() => _beaconOn = false);
                         },
                       ),
@@ -372,7 +416,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                         confirmLabel: 'Cancel exam',
                         action: () async {
                           await _exam.cancelExamSession(_session.id);
-                          await _ble.stopTeacherBeacon();
+                          await _ble.stopExamBeaconAdvertising();
                           if (mounted) setState(() => _beaconOn = false);
                         },
                       ),

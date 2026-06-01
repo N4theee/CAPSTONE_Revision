@@ -12,8 +12,20 @@ class AppConfig {
   static const int rssiThreshold      = -100;
   static const int scanRestartSeconds = 8;
 
+  /// Lenient RSSI for exam join only (continuous monitoring may stay stricter).
+  static const int examJoinRssiThreshold = -95;
+
+  /// Max time to scan for teacher beacon when joining an exam.
+  static const int examJoinScanTimeoutSeconds = 8;
+
   /// Join exam: in-range ticks on the same continuous scan as attendance (see [BleService]).
   static const int examJoinInRangeStreakRequired = 1;
+
+  /// Keep student IN RANGE briefly after a missed exam beacon scan.
+  static const int examProximitySmoothingSeconds = 5;
+
+  /// Show BLE debug panel on student exam screens (set false for production).
+  static const bool showExamBleDebugPanel = true;
 
   // BLE service UUID used as teacher beacon identifier.
   static const String defaultBeaconUuid =
