@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 
@@ -199,7 +200,7 @@ class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScree
     final latestLive = _liveAlertFeed.isNotEmpty ? _liveAlertFeed.first : null;
 
     return Theme(
-      data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Monitor Exam'),
@@ -229,10 +230,7 @@ class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScree
                     children: [
                       Text(
                         widget.session.examTitle,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
+                        style: ExamUi.titleMedium(context),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -247,20 +245,14 @@ class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScree
                       const SizedBox(height: 6),
                       Text(
                         '${widget.offering.subjectCode} • Section ${widget.offering.section}',
-                        style: const TextStyle(
-                          color: TeacherAttendanceUi.textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: ExamUi.bodySecondary(context),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Status: ${widget.session.status} • '
                         'RSSI ${widget.session.rssiThreshold} • '
                         'Grace ${widget.session.gracePeriodSeconds}s',
-                        style: const TextStyle(
-                          color: TeacherAttendanceUi.textSecondary,
-                          fontSize: 12,
-                        ),
+                        style: ExamUi.bodySecondary(context),
                       ),
                     ],
                   ),

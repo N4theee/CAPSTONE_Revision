@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'student_attendance_ui.dart';
+import 'teacher_attendance_ui.dart';
+
 /// Shared text, date formatting, and MCQ choice styling for exam screens only.
 class ExamUi {
   ExamUi._();
 
   static const List<String> choiceLetters = ['A', 'B', 'C', 'D'];
+
+  /// Brighter body text on dark exam scaffolds.
+  static const Color studentPrimaryText = Color(0xFFF0F6FC);
+  static const Color studentSecondaryText = Color(0xFFC9D1D9);
+  static const Color teacherPrimaryText = Color(0xFFF2F4F8);
+  static const Color teacherSecondaryText = Color(0xFFD1D5E0);
 
   static const List<String> _monthNames = [
     'January',
@@ -20,6 +29,52 @@ class ExamUi {
     'November',
     'December',
   ];
+
+  static ThemeData studentThemeOverlay(ThemeData base) {
+    final themed = StudentAttendanceUi.themeOverlay(base);
+    return _brightenTextTheme(
+      themed,
+      primary: studentPrimaryText,
+      secondary: studentSecondaryText,
+    );
+  }
+
+  static ThemeData teacherThemeOverlay(ThemeData base) {
+    final themed = TeacherAttendanceUi.themeOverlay(base);
+    return _brightenTextTheme(
+      themed,
+      primary: teacherPrimaryText,
+      secondary: teacherSecondaryText,
+    );
+  }
+
+  static ThemeData _brightenTextTheme(
+    ThemeData themed, {
+    required Color primary,
+    required Color secondary,
+  }) {
+    final tt = themed.textTheme;
+    return themed.copyWith(
+      textTheme: tt.apply(bodyColor: primary, displayColor: primary).copyWith(
+            titleLarge: tt.titleLarge?.copyWith(color: primary),
+            titleMedium: tt.titleMedium?.copyWith(color: primary),
+            titleSmall: tt.titleSmall?.copyWith(color: primary),
+            bodyLarge: tt.bodyLarge?.copyWith(color: primary),
+            bodyMedium: tt.bodyMedium?.copyWith(color: primary),
+            bodySmall: tt.bodySmall?.copyWith(color: secondary),
+            labelLarge: tt.labelLarge?.copyWith(color: primary),
+            labelMedium: tt.labelMedium?.copyWith(color: secondary),
+            labelSmall: tt.labelSmall?.copyWith(color: secondary),
+          ),
+      listTileTheme: themed.listTileTheme.copyWith(
+        titleTextStyle: tt.titleMedium?.copyWith(
+          color: primary,
+          fontWeight: FontWeight.w600,
+        ),
+        subtitleTextStyle: tt.bodySmall?.copyWith(color: secondary),
+      ),
+    );
+  }
 
   /// Local device time, e.g. `June 2, 2026 - 3:45 PM`.
   static String formatExamDateTime(DateTime? dateTime) {
@@ -37,27 +92,16 @@ class ExamUi {
   static TextStyle? titleMedium(BuildContext context) =>
       Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
           );
 
   static TextStyle? body(BuildContext context) =>
-      Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-          );
+      Theme.of(context).textTheme.bodyMedium;
 
   static TextStyle? bodySecondary(BuildContext context) =>
-      Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(
-                  alpha: 0.65,
-                ),
-          );
+      Theme.of(context).textTheme.bodySmall;
 
   static TextStyle? labelOnCard(BuildContext context) =>
-      Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(
-                  alpha: 0.75,
-                ),
-          );
+      Theme.of(context).textTheme.labelMedium;
 
   /// Letter + choice text with readable contrast on dark cards.
   static Widget mcqChoiceTile({
@@ -70,7 +114,7 @@ class ExamUi {
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final onSurface = scheme.onSurface;
+    final primaryText = theme.textTheme.bodyMedium?.color ?? scheme.onSurface;
     final selectedBg = scheme.primary.withValues(alpha: 0.22);
     final unselectedBg = scheme.surfaceContainerHighest.withValues(
       alpha: theme.brightness == Brightness.dark ? 0.35 : 1.0,
@@ -100,13 +144,13 @@ class ExamUi {
                 radius: 14,
                 backgroundColor: selected
                     ? scheme.primary
-                    : onSurface.withValues(alpha: 0.14),
+                    : primaryText.withValues(alpha: 0.14),
                 child: Text(
                   letter,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: selected ? scheme.onPrimary : onSurface,
+                    color: selected ? scheme.onPrimary : primaryText,
                   ),
                 ),
               ),
@@ -115,7 +159,6 @@ class ExamUi {
                 child: Text(
                   choiceText,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: onSurface,
                     fontWeight:
                         selected ? FontWeight.w600 : FontWeight.normal,
                     height: 1.35,

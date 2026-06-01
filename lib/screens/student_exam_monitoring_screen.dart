@@ -41,6 +41,8 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   DateTime? _lastSeenInRangeAt;
   bool _monitoring = true;
   bool _ended = false;
+  bool _sessionEnded = false;
+  ExamSession? _liveSession;
   String _attemptStatus = 'in_progress';
   int _violationCount = 0;
   bool _submittedMcq = false;
@@ -58,8 +60,24 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
     _attemptStatus = widget.attempt.status;
     _violationCount = widget.attempt.violationCount;
     _submittedMcq = widget.attempt.status == 'completed';
+    _liveSession = widget.session;
     unawaited(_loadQuestionCount());
-    _initMonitoring();
+    unawaited(_initMonitoring());
+  }
+
+  String get _sessionStatus => _liveSession?.status ?? widget.session.status;
+
+  String get _displayStatusLabel => ExamService.studentExamStatusLabel(
+        attemptStatus: _attemptStatus,
+        sessionStatus: _sessionStatus,
+      );
+
+  String get _appBarTitle {
+    if (_sessionEnded || _liveSession?.isTerminal == true) {
+      return 'Exam ended';
+    }
+    if (_attemptStatus == 'completed') return 'Exam submitted';
+    return 'Exam in progress';
   }
 
   String _beaconAdvertisedName() {
@@ -86,7 +104,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
 
     await _startBleMonitor();
 
-    _sessionPollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _sessionPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       unawaited(_checkSessionAndAttempt());
     });
     await _checkSessionAndAttempt();
@@ -100,6 +118,10 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   }
 
   Future<void> _openTakeExam() async {
+    if (_sessionEnded || _liveSession?.isTerminal == true) {
+      _toast('This exam session has ended.');
+      return;
+    }
     if (_ended && _attemptStatus != 'in_progress') return;
     final submitted = await Navigator.push<bool>(
       context,
@@ -132,25 +154,86 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   }
 
   Future<void> _checkSessionAndAttempt() async {
-    if (!_monitoring || _ended) return;
+    if (_ended) return;
 
-    final sessionRow = await _exam.getExamSessionById(widget.session.id);
-    if (sessionRow != null && sessionRow.isTerminal) {
-      await _finishMonitoring(
-        status: _attemptStatus,
-        message: 'The exam session is no longer active (${sessionRow.status}).',
-      );
-      return;
+    try {
+      final sessionRow = await _exam.getExamSessionById(widget.session.id);
+      if (sessionRow != null) {
+        if (mounted) {
+          setState(() => _liveSession = sessionRow);
+        }
+        if (sessionRow.isTerminal) {
+          await _onSessionEnded(sessionRow);
+          return;
+        }
+      }
+
+      if (!_monitoring) return;
+
+      final fresh = await _exam.getExamAttemptById(widget.attempt.id);
+      if (fresh != null) {
+        if (mounted) {
+          setState(() {
+            _attemptStatus = fresh.status;
+            _violationCount = fresh.violationCount;
+            if (fresh.status == 'completed') {
+              _submittedMcq = true;
+              _submittedAttempt = fresh;
+            }
+          });
+        }
+        if (fresh.status == 'auto_ended' || fresh.status == 'flagged') {
+          await _finishMonitoring(
+            status: fresh.status,
+            message: 'Exam ended (${fresh.status}).',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[exam] session/attempt poll: $e');
+    }
+  }
+
+  Future<void> _onSessionEnded(ExamSession sessionRow) async {
+    if (_ended) return;
+
+    _monitoring = false;
+    _sessionEnded = true;
+    _sessionPollTimer?.cancel();
+    _ble.stopExamProximityMonitoring();
+
+    try {
+      final fresh = await _exam.getExamAttemptById(widget.attempt.id);
+      if (fresh != null && mounted) {
+        setState(() {
+          _attemptStatus = fresh.status;
+          _violationCount = fresh.violationCount;
+          if (fresh.status == 'completed') {
+            _submittedMcq = true;
+            _submittedAttempt = fresh;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[exam] refresh attempt on session end: $e');
     }
 
-    final fresh = await _exam.getExamAttemptById(widget.attempt.id);
-    if (fresh != null &&
-        (fresh.status == 'auto_ended' || fresh.status == 'flagged')) {
-      await _finishMonitoring(
-        status: fresh.status,
-        message: 'Exam ended (${fresh.status}).',
-      );
-    }
+    if (!mounted) return;
+    setState(() {});
+
+    final endedLabel = sessionRow.status == 'cancelled'
+        ? 'cancelled'
+        : 'ended by your teacher';
+    await _finishMonitoring(
+      status: _attemptStatus,
+      message:
+          'The exam session was $endedLabel. You can leave this screen.',
+    );
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _persistProximityLog({
@@ -171,7 +254,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   }
 
   Future<void> _handleOutOfRange() async {
-    if (_ended) return;
+    if (_ended || _sessionEnded) return;
     _violationCount += 1;
     try {
       await _exam.updateExamAttemptStatus(
@@ -199,7 +282,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   }
 
   Future<void> _handleReturnedInRange() async {
-    if (_ended) return;
+    if (_ended || _sessionEnded) return;
     try {
       await _exam.createExamAlert(
         examSessionId: widget.session.id,
@@ -408,10 +491,10 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
         }
       },
       child: Theme(
-        data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
+        data: ExamUi.studentThemeOverlay(Theme.of(context)),
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Exam in progress'),
+            title: Text(_appBarTitle),
           ),
           body: ListView(
             padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
@@ -426,56 +509,79 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
                 'Code ${widget.session.examCode} • Section ${widget.offering.section}',
                 style: ExamUi.bodySecondary(context),
               ),
-              const SizedBox(height: 24),
+              if (_sessionEnded || _liveSession?.isTerminal == true) ...[
+                Card(
+                  color: Colors.orangeAccent.withValues(alpha: 0.12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.event_busy_rounded,
+                          color: Colors.orangeAccent,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Session $_sessionStatus. '
+                            'Status: $_displayStatusLabel',
+                            style: ExamUi.body(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
                       Icon(
-                        _inRange
-                            ? Icons.sensors_rounded
-                            : Icons.sensors_off_rounded,
+                        _sessionEnded
+                            ? Icons.event_busy_rounded
+                            : (_inRange
+                                ? Icons.sensors_rounded
+                                : Icons.sensors_off_rounded),
                         size: 48,
-                        color: statusColor,
+                        color: _sessionEnded
+                            ? Colors.orangeAccent
+                            : statusColor,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        statusLabel,
+                        _sessionEnded ? _displayStatusLabel : statusLabel,
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: statusColor,
+                          color: _sessionEnded
+                              ? Colors.orangeAccent
+                              : statusColor,
                         ),
                       ),
-                      if (_rssi != null) ...[
+                      if (_rssi != null && !_sessionEnded) ...[
                         const SizedBox(height: 8),
                         Text(
                           'RSSI $_rssi (threshold $_rssiThreshold)',
-                          style: const TextStyle(
-                            color: StudentAttendanceUi.textSecondary,
-                            fontSize: 12,
-                          ),
+                          style: ExamUi.bodySecondary(context),
                         ),
                       ],
                       const SizedBox(height: 8),
                       Text(
-                        'Attempt: $_attemptStatus • Violations: $_violationCount',
-                        style: const TextStyle(
-                          color: StudentAttendanceUi.textSecondary,
-                          fontSize: 12,
-                        ),
+                        'Exam: $_displayStatusLabel • Violations: $_violationCount',
+                        style: ExamUi.bodySecondary(context),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: StudentAttendanceUi.textSecondary
-                              .withValues(alpha: 0.85),
-                          fontSize: 11,
+                      if (!_sessionEnded) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end',
+                          textAlign: TextAlign.center,
+                          style: ExamUi.bodySecondary(context),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -515,7 +621,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
                       ),
                     ),
                   )
-                else
+                else if (!_sessionEnded)
                   FilledButton.icon(
                     onPressed: _openTakeExam,
                     icon: const Icon(Icons.edit_note_rounded),
@@ -524,26 +630,20 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
                     ),
                   ),
                 const SizedBox(height: 12),
-              ] else if (_questionCount == 0)
-                const Text(
+              ] else if (_questionCount == 0 && !_sessionEnded)
+                Text(
                   'Waiting for exam questions from your teacher.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: StudentAttendanceUi.textSecondary,
-                    fontSize: 12,
-                  ),
+                  style: ExamUi.bodySecondary(context),
                 ),
-              Text(
-                'Stay near the teacher device. Brief signal drops are ignored for '
-                '${AppConfig.examProximitySmoothingSeconds}s. '
-                'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: StudentAttendanceUi.textOnField,
-                  fontSize: 12,
-                  height: 1.35,
+              if (!_sessionEnded)
+                Text(
+                  'Stay near the teacher device. Brief signal drops are ignored for '
+                  '${AppConfig.examProximitySmoothingSeconds}s. '
+                  'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end.',
+                  textAlign: TextAlign.center,
+                  style: ExamUi.bodySecondary(context)?.copyWith(height: 1.35),
                 ),
-              ),
               if (AppConfig.showExamBleDebugPanel) ...[
                 const SizedBox(height: 16),
                 _examBleDebugPanel(),
@@ -568,13 +668,11 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'BLE debug (dev)',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: StudentAttendanceUi.textSecondary,
-              ),
+              style: ExamUi.labelOnCard(context)?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
             _debugRow('Expected UUID', _beaconUuid),
@@ -621,16 +719,16 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
             width: 130,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: StudentAttendanceUi.textSecondary,
-              ),
+              style: ExamUi.bodySecondary(context)?.copyWith(fontSize: 11),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+              style: ExamUi.bodySecondary(context)?.copyWith(
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
             ),
           ),
         ],

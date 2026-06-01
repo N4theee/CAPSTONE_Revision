@@ -158,7 +158,7 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
     final hPad = AppBreakpoints.horizontalPadding(context);
 
     return Theme(
-      data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Exam Rankings'),
@@ -218,12 +218,12 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
               else if (_error != null)
                 Text(_error!, style: const TextStyle(color: Colors.redAccent))
               else if (_rows.isEmpty)
-                const Card(
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Text(
                       'No rankings yet. Rankings are recorded when exam attempts are scored.',
-                      style: TextStyle(color: TeacherAttendanceUi.textSecondary),
+                      style: ExamUi.bodySecondary(context),
                     ),
                   ),
                 )

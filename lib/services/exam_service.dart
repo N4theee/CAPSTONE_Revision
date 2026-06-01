@@ -245,6 +245,7 @@ class StudentExamHistoryItem {
     required this.violationCount,
     this.percentageScore,
     this.completionSeconds,
+    this.sessionStatus,
   });
 
   final String attemptId;
@@ -261,9 +262,16 @@ class StudentExamHistoryItem {
   final int violationCount;
   final double? percentageScore;
   final int? completionSeconds;
+  final String? sessionStatus;
 
   /// Best instant for "finished at" display (submitted → ended → null).
   DateTime? get finishedAt => submittedAt ?? endedAt;
+
+  /// Human-readable status (accounts for teacher-ended session).
+  String get displayStatus => ExamService.studentExamStatusLabel(
+        attemptStatus: status,
+        sessionStatus: sessionStatus,
+      );
 }
 
 /// Thrown when exam validation or persistence fails in a user-visible way.
@@ -1435,6 +1443,51 @@ class ExamService {
     return seconds.clamp(0, 86400);
   }
 
+  /// Student-facing exam/attempt status label.
+  static String studentExamStatusLabel({
+    required String attemptStatus,
+    String? sessionStatus,
+  }) {
+    final session = sessionStatus?.trim() ?? '';
+    if (session == 'ended' || session == 'cancelled') {
+      switch (attemptStatus) {
+        case 'completed':
+          return 'Completed';
+        case 'auto_ended':
+          return 'Auto ended';
+        case 'flagged':
+          return 'Flagged';
+        default:
+          return session == 'cancelled' ? 'Cancelled' : 'Session ended';
+      }
+    }
+    switch (attemptStatus) {
+      case 'completed':
+        return 'Completed';
+      case 'auto_ended':
+        return 'Auto ended';
+      case 'flagged':
+        return 'Flagged';
+      case 'in_progress':
+        return 'In progress';
+      default:
+        return attemptStatus;
+    }
+  }
+
+  /// Machine key for status chip colors in history UI.
+  static String studentExamStatusKey({
+    required String attemptStatus,
+    String? sessionStatus,
+  }) {
+    final session = sessionStatus?.trim() ?? '';
+    if ((session == 'ended' || session == 'cancelled') &&
+        attemptStatus == 'in_progress') {
+      return session == 'cancelled' ? 'cancelled' : 'session_ended';
+    }
+    return attemptStatus;
+  }
+
   StudentExamHistoryItem _studentHistoryFromAttemptRow(
     Map<String, dynamic> m,
     Map<String, dynamic> sm, {
@@ -1472,6 +1525,7 @@ class ExamService {
       percentageScore: (m['percentage_score'] as num?)?.toDouble() ??
           (m['exam_score'] as num?)?.toDouble(),
       completionSeconds: completionSeconds,
+      sessionStatus: _jsonStr(sm['status']).isEmpty ? null : _jsonStr(sm['status']),
     );
   }
 
@@ -1650,7 +1704,7 @@ class ExamService {
               .select(
                 'id, exam_session_id, status, started_at, ended_at, submitted_at, '
                 'violation_count, percentage_score, exam_score, completion_seconds, '
-                'exam_sessions(exam_title, exam_code, subject_offering_id)',
+                'exam_sessions(exam_title, exam_code, subject_offering_id, status)',
               )
               .eq('student_id', studentId.trim())
               .order('started_at', ascending: false),
@@ -1739,6 +1793,7 @@ class ExamService {
             'exam_title': sess.examTitle,
             'exam_code': sess.examCode,
             'subject_offering_id': sess.subjectOfferingId,
+            'status': sess.status,
           },
           subjectCode: subjectCode,
           subjectTitle: subjectTitle,

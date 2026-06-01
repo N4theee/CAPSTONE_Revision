@@ -33,7 +33,7 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
   }
 
   Future<void> _clearHistory() async {
-    final themed = StudentAttendanceUi.themeOverlay(Theme.of(context));
+    final themed = ExamUi.studentThemeOverlay(Theme.of(context));
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => Theme(
@@ -111,13 +111,15 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
     }
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
+  Color _statusColor(String statusKey) {
+    switch (statusKey) {
       case 'completed':
         return StudentAttendanceUi.success;
       case 'auto_ended':
+      case 'session_ended':
         return Colors.orangeAccent;
       case 'flagged':
+      case 'cancelled':
         return Colors.redAccent;
       default:
         return StudentAttendanceUi.accentTeal;
@@ -129,7 +131,7 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
     final hPad = AppBreakpoints.horizontalPadding(context);
 
     return Theme(
-      data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.studentThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Exam History'),
@@ -164,17 +166,21 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
               else if (_error != null)
                 Text(_error!, style: const TextStyle(color: Colors.redAccent))
               else if (_history.isEmpty)
-                const Card(
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Text(
                       'No exam attempts yet for this subject.',
-                      style: TextStyle(color: StudentAttendanceUi.textSecondary),
+                      style: ExamUi.bodySecondary(context),
                     ),
                   ),
                 )
               else
                 ..._history.map((item) {
+                  final statusKey = ExamService.studentExamStatusKey(
+                    attemptStatus: item.status,
+                    sessionStatus: item.sessionStatus,
+                  );
                   final finished = item.finishedAt;
                   final scoreLine = item.percentageScore != null
                       ? 'Score: ${item.percentageScore!.toStringAsFixed(1)}%'
@@ -208,15 +214,15 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          border: Border.all(color: _statusColor(item.status)),
+                          border: Border.all(color: _statusColor(statusKey)),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          item.status,
+                          item.displayStatus,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: _statusColor(item.status),
+                            color: _statusColor(statusKey),
                           ),
                         ),
                       ),

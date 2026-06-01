@@ -81,7 +81,7 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
       firstDate: now.subtract(const Duration(days: 1)),
       lastDate: now.add(const Duration(days: 365)),
       builder: (ctx, child) => Theme(
-        data: TeacherAttendanceUi.themeOverlay(Theme.of(ctx)),
+        data: ExamUi.teacherThemeOverlay(Theme.of(ctx)),
         child: child ?? const SizedBox.shrink(),
       ),
     );
@@ -92,7 +92,7 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
         isStart ? (_startsAt ?? now) : (_endsAt ?? now),
       ),
       builder: (ctx, child) => Theme(
-        data: TeacherAttendanceUi.themeOverlay(Theme.of(ctx)),
+        data: ExamUi.teacherThemeOverlay(Theme.of(ctx)),
         child: child ?? const SizedBox.shrink(),
       ),
     );
@@ -259,7 +259,7 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
     final hPad = AppBreakpoints.horizontalPadding(context);
 
     return Theme(
-      data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(title: const Text('Create Exam Session')),
         body: _saving

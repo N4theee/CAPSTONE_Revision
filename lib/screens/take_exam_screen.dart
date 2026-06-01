@@ -42,6 +42,18 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       _error = null;
     });
     try {
+      final sessionRow = await _exam.getExamSessionById(widget.session.id);
+      if (sessionRow != null && sessionRow.isTerminal) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error =
+              'This exam session has ended (${sessionRow.status}). '
+              'You cannot submit answers anymore.';
+        });
+        return;
+      }
+
       final fresh = await _exam.getExamAttemptById(widget.attempt.id);
       if (fresh != null && fresh.isTerminal) {
         if (!mounted) return;
@@ -203,7 +215,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Theme(
-      data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.studentThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Take exam'),

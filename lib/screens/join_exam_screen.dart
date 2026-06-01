@@ -100,9 +100,18 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
     }
 
     if (attempt != null && attempt.status == 'in_progress') {
+      final liveSession = await _exam.getExamSessionById(session.id);
+      if (liveSession != null && liveSession.isTerminal) {
+        throw ExamServiceException(
+          'This exam session has ended. See Exam History for your record.',
+        );
+      }
       if (!mounted) return;
       setState(() => _loadState = _JoinLoadState.idle);
-      _navigateToMonitor(session: session, attempt: attempt);
+      _navigateToMonitor(
+        session: liveSession ?? session,
+        attempt: attempt,
+      );
       throw _ResumeExistingAttempt();
     }
   }
@@ -153,12 +162,18 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
       studentId: widget.studentId,
     );
     if (existing != null && existing.status == 'in_progress') {
+      final liveSession = await _exam.getExamSessionById(session.id);
+      if (liveSession != null && liveSession.isTerminal) {
+        throw ExamServiceException(
+          'This exam session has ended. See Exam History for your record.',
+        );
+      }
       if (!mounted) return;
       setState(() {
         _loadState = _JoinLoadState.proximityPassed;
         _statusLine = null;
       });
-      _navigateToMonitor(session: session, attempt: existing);
+      _navigateToMonitor(session: liveSession ?? session, attempt: existing);
       return;
     }
 
@@ -384,7 +399,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
     final showRetry = _loadState == _JoinLoadState.proximityFailed;
 
     return Theme(
-      data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.studentThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(title: const Text('Join Exam')),
         body: ListView(

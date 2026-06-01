@@ -177,7 +177,7 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
         '${widget.offering.subjectCode} - ${widget.offering.subjectTitle}';
 
     return Theme(
-      data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Exam Sessions'),

@@ -171,7 +171,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
     final isTerminal = _session.isTerminal;
 
     return Theme(
-      data: TeacherAttendanceUi.themeOverlay(Theme.of(context)),
+      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(title: const Text('Exam Active')),
         body: _busy
