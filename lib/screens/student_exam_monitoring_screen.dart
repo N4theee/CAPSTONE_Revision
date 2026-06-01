@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../config.dart';
 import '../services/ble_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/student_attendance_ui.dart';
 import 'take_exam_screen.dart';
@@ -43,6 +44,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   String _attemptStatus = 'in_progress';
   int _violationCount = 0;
   bool _submittedMcq = false;
+  ExamAttempt? _submittedAttempt;
   int? _questionCount;
 
   Timer? _sessionPollTimer;
@@ -110,13 +112,22 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
       ),
     );
     if (submitted == true && mounted) {
-      final fresh = await _exam.getExamAttemptById(widget.attempt.id);
-      setState(() {
-        _submittedMcq = true;
-        if (fresh != null) {
-          _attemptStatus = fresh.status;
-        }
-      });
+      try {
+        final fresh = await _exam.getExamAttemptById(widget.attempt.id);
+        if (!mounted) return;
+        setState(() {
+          _submittedMcq = true;
+          if (fresh != null) {
+            _attemptStatus = fresh.status;
+            _submittedAttempt = fresh;
+          }
+        });
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not refresh exam result: $e')),
+        );
+      }
     }
   }
 
@@ -289,7 +300,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
       builder: (ctx) => AlertDialog(
         backgroundColor: StudentAttendanceUi.surfaceElevated,
         title: Text(title),
-        content: Text(body),
+        content: Text(body, style: ExamUi.body(ctx)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -407,25 +418,13 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
             children: [
               Text(
                 widget.session.examTitle,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 20,
-                ),
+                style: ExamUi.titleMedium(context)?.copyWith(fontSize: 20),
               ),
               const SizedBox(height: 6),
-              Text(
-                subjectLabel,
-                style: const TextStyle(
-                  color: StudentAttendanceUi.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
+              Text(subjectLabel, style: ExamUi.bodySecondary(context)),
               Text(
                 'Code ${widget.session.examCode} • Section ${widget.offering.section}',
-                style: const TextStyle(
-                  color: StudentAttendanceUi.textSecondary,
-                  fontSize: 12,
-                ),
+                style: ExamUi.bodySecondary(context),
               ),
               const SizedBox(height: 24),
               Card(
@@ -486,11 +485,33 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
                 if (_submittedMcq)
                   Card(
                     color: StudentAttendanceUi.success.withValues(alpha: 0.12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: Text(
-                        'Exam answers submitted. Proximity monitoring continues until the session ends.',
-                        style: TextStyle(fontSize: 13),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Exam answers submitted. Proximity monitoring continues until the session ends.',
+                            style: ExamUi.body(context),
+                          ),
+                          if (_submittedAttempt != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Score: ${_submittedAttempt!.percentageScore.toStringAsFixed(1)}% • '
+                              'Time: ${ExamService.formatCompletionTime(_submittedAttempt!.completionSeconds)}',
+                              style: ExamUi.bodySecondary(context),
+                            ),
+                            Text(
+                              'Submitted: ${ExamUi.formatExamDateTime(
+                                ExamService.resolveAttemptSubmittedAt(
+                                  submittedAt: _submittedAttempt!.submittedAt,
+                                  endedAt: _submittedAttempt!.endedAt,
+                                ),
+                              )}',
+                              style: ExamUi.bodySecondary(context),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   )

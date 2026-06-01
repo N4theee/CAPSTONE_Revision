@@ -7,6 +7,7 @@ import '../config.dart';
 import '../services/ble_service.dart';
 import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 import 'teacher_exam_monitoring_screen.dart';
@@ -160,15 +161,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
     }
   }
 
-  String _fmt(DateTime? dt) {
-    if (dt == null) return '—';
-    final l = dt.toLocal();
-    final m = l.month.toString().padLeft(2, '0');
-    final d = l.day.toString().padLeft(2, '0');
-    final hh = l.hour.toString().padLeft(2, '0');
-    final mm = l.minute.toString().padLeft(2, '0');
-    return '${l.year}-$m-$d $hh:$mm';
-  }
+  String _fmt(DateTime? dt) => ExamUi.formatExamDateTime(dt);
 
   @override
   Widget build(BuildContext context) {
@@ -462,11 +455,10 @@ class _DetailRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white,
-                fontFamily: mono ? 'monospace' : null,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    fontFamily: mono ? 'monospace' : null,
+                  ),
             ),
           ),
         ],

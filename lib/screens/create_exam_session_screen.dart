@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../config.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 
@@ -306,9 +307,13 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
                   const SizedBox(height: 16),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Schedule start time'),
-                    subtitle: const Text(
+                    title: Text(
+                      'Schedule start time',
+                      style: ExamUi.titleMedium(context),
+                    ),
+                    subtitle: Text(
                       'If off, exam is active immediately when created',
+                      style: ExamUi.bodySecondary(context),
                     ),
                     value: _useSchedule,
                     onChanged: (v) => setState(() {
@@ -319,22 +324,27 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
                   if (_useSchedule)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Start time'),
+                      title: Text('Start time', style: ExamUi.titleMedium(context)),
                       subtitle: Text(
                         _startsAt == null
                             ? 'Not set'
-                            : _startsAt!.toString().substring(0, 16),
+                            : ExamUi.formatExamDateTime(_startsAt),
+                        style: ExamUi.bodySecondary(context),
                       ),
                       trailing: const Icon(Icons.calendar_today_outlined),
                       onTap: () => _pickDateTime(isStart: true),
                     ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('End time (optional)'),
+                    title: Text(
+                      'End time (optional)',
+                      style: ExamUi.titleMedium(context),
+                    ),
                     subtitle: Text(
                       _endsAt == null
                           ? 'Not set'
-                          : _endsAt!.toString().substring(0, 16),
+                          : ExamUi.formatExamDateTime(_endsAt),
+                      style: ExamUi.bodySecondary(context),
                     ),
                     trailing: const Icon(Icons.event_outlined),
                     onTap: () => _pickDateTime(isStart: false),

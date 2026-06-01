@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 
@@ -30,16 +31,17 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
     _load();
   }
 
-  Future<void> _clearRankings() async {
+  Future<void> _deleteExamSession() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TeacherAttendanceUi.surface,
-        title: const Text('Clear rankings'),
+        title: Text('Delete exam session?', style: ExamUi.titleMedium(ctx)),
         content: Text(
-          'Delete all ranking rows for "${widget.session.examTitle}" '
-          '(${widget.session.examCode})? This cannot be undone.',
-          style: const TextStyle(color: TeacherAttendanceUi.textOnField),
+          'Are you sure you want to delete this exam? This will remove the exam '
+          'session, questions, choices, attempts, answers, proximity logs, alerts, '
+          'and rankings.',
+          style: ExamUi.body(ctx),
         ),
         actions: [
           TextButton(
@@ -47,30 +49,40 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: TeacherAttendanceUi.anomalyRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear'),
+            child: const Text('Delete Exam Session'),
           ),
         ],
       ),
     );
     if (ok != true || !mounted) return;
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
     try {
-      await _exam.clearExamRankingsForSession(widget.session.id);
-      if (!mounted) return;
-      await _load();
+      await _exam.deleteExamSessionCompletely(widget.session.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rankings cleared.')),
+        const SnackBar(content: Text('Exam session deleted.')),
       );
+      Navigator.pop(context, true);
     } on ExamServiceException catch (e) {
       if (!mounted) return;
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
     } catch (e) {
       if (!mounted) return;
+      setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear rankings: $e')),
+        SnackBar(content: Text('Could not delete exam: $e')),
       );
     }
   }
@@ -80,11 +92,11 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TeacherAttendanceUi.surface,
-        title: const Text('Clear all class rankings'),
+        title: Text('Clear all class rankings?', style: ExamUi.titleMedium(ctx)),
         content: Text(
           'Delete rankings for every exam session in ${widget.offering.subjectCode} '
           'Section ${widget.offering.section}? This cannot be undone.',
-          style: const TextStyle(color: TeacherAttendanceUi.textOnField),
+          style: ExamUi.body(ctx),
         ),
         actions: [
           TextButton(
@@ -152,9 +164,9 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
           title: const Text('Exam Rankings'),
           actions: [
             IconButton(
-              tooltip: 'Clear rankings for this exam',
-              onPressed: _rows.isEmpty || _loading ? null : _clearRankings,
-              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Delete exam session',
+              onPressed: _loading ? null : _deleteExamSession,
+              icon: const Icon(Icons.delete_forever_outlined),
             ),
             PopupMenuButton<String>(
               tooltip: 'More',
@@ -178,16 +190,23 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
             children: [
               Text(
                 widget.session.examTitle,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
+                style: ExamUi.titleMedium(context),
               ),
               Text(
                 '${widget.session.examCode} • ${widget.offering.subjectCode}',
-                style: const TextStyle(
-                  color: TeacherAttendanceUi.textSecondary,
-                  fontSize: 13,
+                style: ExamUi.bodySecondary(context),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: TeacherAttendanceUi.anomalyRed,
+                    side: const BorderSide(color: TeacherAttendanceUi.anomalyRed),
+                  ),
+                  onPressed: _loading ? null : _deleteExamSession,
+                  icon: const Icon(Icons.delete_forever_outlined, size: 18),
+                  label: const Text('Delete Exam Session'),
                 ),
               ),
               const SizedBox(height: 16),
@@ -228,7 +247,9 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
                       ),
                       title: Text(
                         r.studentName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       subtitle: Text(
                         'Score ${r.examScore.toStringAsFixed(1)}% • '

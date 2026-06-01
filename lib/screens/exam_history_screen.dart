@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/student_attendance_ui.dart';
 
@@ -110,16 +111,6 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
     }
   }
 
-  String _fmt(DateTime dt) {
-    final l = dt.toLocal();
-    final m = l.month.toString().padLeft(2, '0');
-    final d = l.day.toString().padLeft(2, '0');
-    final y = l.year.toString();
-    final hh = l.hour.toString().padLeft(2, '0');
-    final mm = l.minute.toString().padLeft(2, '0');
-    return '$y-$m-$d $hh:$mm';
-  }
-
   Color _statusColor(String status) {
     switch (status) {
       case 'completed':
@@ -158,14 +149,11 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
             children: [
               Text(
                 '${widget.offering.subjectCode} - ${widget.offering.subjectTitle}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: ExamUi.titleMedium(context),
               ),
               Text(
                 'Section ${widget.offering.section}',
-                style: const TextStyle(
-                  color: StudentAttendanceUi.textSecondary,
-                  fontSize: 13,
-                ),
+                style: ExamUi.bodySecondary(context),
               ),
               const SizedBox(height: 16),
               if (_loading)
@@ -187,18 +175,31 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
                 )
               else
                 ..._history.map((item) {
+                  final finished = item.finishedAt;
+                  final scoreLine = item.percentageScore != null
+                      ? 'Score: ${item.percentageScore!.toStringAsFixed(1)}%'
+                      : null;
+                  final timeLine = item.completionSeconds != null &&
+                          item.completionSeconds! > 0
+                      ? 'Time: ${ExamService.formatCompletionTime(item.completionSeconds)}'
+                      : null;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
                     child: ListTile(
                       title: Text(
                         item.examTitle,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       subtitle: Text(
                         '${item.examCode}\n'
-                        'Started ${_fmt(item.startedAt)}'
-                        '${item.endedAt != null ? ' • Ended ${_fmt(item.endedAt!)}' : ''}\n'
-                        'Violations: ${item.violationCount}',
+                        'Started ${ExamUi.formatExamDateTime(item.startedAt)}'
+                        '${finished != null ? '\nSubmitted ${ExamUi.formatExamDateTime(finished)}' : ''}'
+                        '${scoreLine != null ? '\n$scoreLine' : ''}'
+                        '${timeLine != null ? ' • $timeLine' : ''}'
+                        '\nViolations: ${item.violationCount}',
+                        style: ExamUi.bodySecondary(context),
                       ),
                       isThreeLine: true,
                       trailing: Container(

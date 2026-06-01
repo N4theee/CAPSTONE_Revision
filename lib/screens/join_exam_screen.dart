@@ -5,6 +5,7 @@ import '../config.dart';
 import '../services/ble_service.dart';
 import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/student_attendance_ui.dart';
 import 'student_exam_monitoring_screen.dart';
@@ -391,15 +392,12 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
           children: [
             Text(
               widget.offering.label,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              style: ExamUi.titleMedium(context),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Exam must be active for this class',
-              style: TextStyle(
-                color: StudentAttendanceUi.textSecondary,
-                fontSize: 12,
-              ),
+              style: ExamUi.bodySecondary(context),
             ),
             const SizedBox(height: 24),
             TextField(
@@ -425,9 +423,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
                 Text(
                   _statusLine!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: StudentAttendanceUi.textSecondary,
-                  ),
+                  style: ExamUi.bodySecondary(context),
                 ),
             ] else if (showRetry) ...[
               Icon(
@@ -439,10 +435,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
               Text(
                 _statusLine ?? '',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: StudentAttendanceUi.textSecondary,
-                  height: 1.4,
-                ),
+                style: ExamUi.bodySecondary(context)?.copyWith(height: 1.4),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -478,11 +471,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
               'Your teacher must open the active exam on their phone (beacon on). '
               'After the code is accepted, we scan for up to '
               '${AppConfig.examJoinScanTimeoutSeconds} seconds. Keep Bluetooth and Location on.',
-              style: TextStyle(
-                color: StudentAttendanceUi.textOnField,
-                fontSize: 13,
-                height: 1.4,
-              ),
+              style: ExamUi.bodySecondary(context)?.copyWith(height: 1.4),
             ),
           ],
         ),

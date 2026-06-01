@@ -149,12 +149,14 @@ class ExamSubmitResult {
     required this.totalPoints,
     required this.percentageScore,
     required this.completionSeconds,
+    required this.submittedAt,
   });
 
   final int rawScore;
   final int totalPoints;
   final double percentageScore;
   final int completionSeconds;
+  final DateTime submittedAt;
 }
 
 class ExamAttemptMonitorRow {
@@ -239,7 +241,10 @@ class StudentExamHistoryItem {
     required this.status,
     required this.startedAt,
     this.endedAt,
+    this.submittedAt,
     required this.violationCount,
+    this.percentageScore,
+    this.completionSeconds,
   });
 
   final String attemptId;
@@ -252,7 +257,13 @@ class StudentExamHistoryItem {
   final String status;
   final DateTime startedAt;
   final DateTime? endedAt;
+  final DateTime? submittedAt;
   final int violationCount;
+  final double? percentageScore;
+  final int? completionSeconds;
+
+  /// Best instant for "finished at" display (submitted → ended → null).
+  DateTime? get finishedAt => submittedAt ?? endedAt;
 }
 
 /// Thrown when exam validation or persistence fails in a user-visible way.
@@ -1264,11 +1275,12 @@ class ExamService {
 
       final percentageScore =
           totalPoints > 0 ? (rawScore / totalPoints) * 100.0 : 0.0;
-      final now = DateTime.now().toUtc();
-      final completionSeconds = now
-          .difference(attempt.startedAt.toUtc())
-          .inSeconds
-          .clamp(0, 86400);
+      final submittedAtUtc = DateTime.now().toUtc();
+      final submittedIso = submittedAtUtc.toIso8601String();
+      final completionSeconds = completionSecondsBetween(
+        startedAt: attempt.startedAt,
+        submittedAt: submittedAtUtc,
+      );
 
       await _db.from('exam_answers').upsert(
         answerRows,
@@ -1282,8 +1294,8 @@ class ExamService {
         'percentage_score': percentageScore,
         'exam_score': percentageScore,
         'completion_seconds': completionSeconds,
-        'submitted_at': utcIsoNowForDb(),
-        'ended_at': utcIsoNowForDb(),
+        'submitted_at': submittedIso,
+        'ended_at': submittedIso,
       }).eq('id', attemptId);
 
       await recomputeExamRankingsForSession(attempt.examSessionId);
@@ -1298,6 +1310,7 @@ class ExamService {
         totalPoints: totalPoints,
         percentageScore: percentageScore,
         completionSeconds: completionSeconds,
+        submittedAt: submittedAtUtc.toLocal(),
       );
     } catch (e) {
       if (e is ExamServiceException) rethrow;
@@ -1391,6 +1404,75 @@ class ExamService {
     final s = seconds % 60;
     if (m > 0) return '${m}m ${s}s';
     return '${s}s';
+  }
+
+  /// Picks the best completion instant from an attempt row or model.
+  static DateTime? resolveAttemptSubmittedAt({
+    DateTime? submittedAt,
+    DateTime? endedAt,
+    dynamic updatedAt,
+  }) {
+    if (submittedAt != null && submittedAt.year >= 2000) {
+      return submittedAt.toLocal();
+    }
+    if (endedAt != null && endedAt.year >= 2000) {
+      return endedAt.toLocal();
+    }
+    final parsed = tryParseDbTimestamptzToLocal(updatedAt);
+    if (parsed != null && parsed.year >= 2000) return parsed;
+    return null;
+  }
+
+  static int completionSecondsBetween({
+    required DateTime startedAt,
+    required DateTime submittedAt,
+  }) {
+    final seconds = submittedAt
+        .toUtc()
+        .difference(startedAt.toUtc())
+        .inSeconds;
+    if (seconds < 0) return 0;
+    return seconds.clamp(0, 86400);
+  }
+
+  StudentExamHistoryItem _studentHistoryFromAttemptRow(
+    Map<String, dynamic> m,
+    Map<String, dynamic> sm, {
+    required String subjectCode,
+    required String subjectTitle,
+    required String section,
+  }) {
+    final submittedAt = tryParseDbTimestamptzToLocal(m['submitted_at']);
+    final endedAt = tryParseDbTimestamptzToLocal(m['ended_at']);
+    var completionSeconds = (m['completion_seconds'] as num?)?.toInt();
+    if ((completionSeconds == null || completionSeconds <= 0) &&
+        submittedAt != null) {
+      final started =
+          tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now();
+      completionSeconds = completionSecondsBetween(
+        startedAt: started,
+        submittedAt: submittedAt,
+      );
+    }
+
+    return StudentExamHistoryItem(
+      attemptId: _jsonStr(m['id']),
+      examSessionId: _jsonStr(m['exam_session_id']),
+      examTitle: _jsonStr(sm['exam_title']),
+      examCode: _jsonStr(sm['exam_code']),
+      subjectCode: subjectCode,
+      subjectTitle: subjectTitle,
+      section: section,
+      status: _jsonStr(m['status']),
+      startedAt:
+          tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now(),
+      endedAt: endedAt,
+      submittedAt: submittedAt,
+      violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
+      percentageScore: (m['percentage_score'] as num?)?.toDouble() ??
+          (m['exam_score'] as num?)?.toDouble(),
+      completionSeconds: completionSeconds,
+    );
   }
 
   // ── 9) Rankings ────────────────────────────────────────────────────────────
@@ -1566,7 +1648,8 @@ class ExamService {
           await _db
               .from('exam_attempts')
               .select(
-                'id, exam_session_id, status, started_at, ended_at, violation_count, '
+                'id, exam_session_id, status, started_at, ended_at, submitted_at, '
+                'violation_count, percentage_score, exam_score, completion_seconds, '
                 'exam_sessions(exam_title, exam_code, subject_offering_id)',
               )
               .eq('student_id', studentId.trim())
@@ -1595,19 +1678,12 @@ class ExamService {
         }
 
         list.add(
-          StudentExamHistoryItem(
-            attemptId: _jsonStr(m['id']),
-            examSessionId: _jsonStr(m['exam_session_id']),
-            examTitle: _jsonStr(sm['exam_title']),
-            examCode: _jsonStr(sm['exam_code']),
+          _studentHistoryFromAttemptRow(
+            m,
+            sm,
             subjectCode: subjectCode,
             subjectTitle: subjectTitle,
             section: section,
-            status: _jsonStr(m['status']),
-            startedAt:
-                tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now(),
-            endedAt: tryParseDbTimestamptzToLocal(m['ended_at']),
-            violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
           ),
         );
       }
@@ -1657,19 +1733,16 @@ class ExamService {
       }
 
       list.add(
-        StudentExamHistoryItem(
-          attemptId: _jsonStr(m['id']),
-          examSessionId: sessionId,
-          examTitle: sess.examTitle,
-          examCode: sess.examCode,
+        _studentHistoryFromAttemptRow(
+          m,
+          {
+            'exam_title': sess.examTitle,
+            'exam_code': sess.examCode,
+            'subject_offering_id': sess.subjectOfferingId,
+          },
           subjectCode: subjectCode,
           subjectTitle: subjectTitle,
           section: section,
-          status: _jsonStr(m['status']),
-          startedAt:
-              tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now(),
-          endedAt: tryParseDbTimestamptzToLocal(m['ended_at']),
-          violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
         ),
       );
     }
@@ -1752,6 +1825,102 @@ class ExamService {
       debugPrint('[ExamService] Cleared rankings for session $examSessionId');
     } catch (e) {
       _rethrowPostgrest(e, 'clearExamRankingsForSession failed');
+    }
+  }
+
+  /// Deletes one exam session and all related rows (safe if some tables are missing).
+  Future<void> deleteExamSessionCompletely(String examSessionId) async {
+    final sid = examSessionId.trim();
+    if (sid.isEmpty) {
+      throw ExamServiceException('Invalid exam session id.');
+    }
+
+    try {
+      final attemptsRaw = await _db
+          .from('exam_attempts')
+          .select('id')
+          .eq('exam_session_id', sid);
+      final attemptIds = attemptsRaw
+          .map((r) => _jsonStr(
+                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+              ))
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      if (attemptIds.isNotEmpty) {
+        await _safeDeleteTable(
+          () => _db
+              .from('exam_answers')
+              .delete()
+              .inFilter('exam_attempt_id', attemptIds),
+          'exam_answers',
+        );
+      }
+
+      final questionsRaw = await _db
+          .from('exam_questions')
+          .select('id')
+          .eq('exam_session_id', sid);
+      final questionIds = questionsRaw
+          .map((r) => _jsonStr(
+                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+              ))
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      if (questionIds.isNotEmpty) {
+        await _safeDeleteTable(
+          () => _db
+              .from('exam_choices')
+              .delete()
+              .inFilter('exam_question_id', questionIds),
+          'exam_choices',
+        );
+      }
+
+      await _safeDeleteTable(
+        () => _db.from('exam_questions').delete().eq('exam_session_id', sid),
+        'exam_questions',
+      );
+      await _safeDeleteTable(
+        () => _db.from('exam_rankings').delete().eq('exam_session_id', sid),
+        'exam_rankings',
+      );
+      await _safeDeleteTable(
+        () =>
+            _db.from('exam_proximity_logs').delete().eq('exam_session_id', sid),
+        'exam_proximity_logs',
+      );
+      await _safeDeleteTable(
+        () => _db.from('exam_alerts').delete().eq('exam_session_id', sid),
+        'exam_alerts',
+      );
+      await _safeDeleteTable(
+        () => _db.from('exam_attempts').delete().eq('exam_session_id', sid),
+        'exam_attempts',
+      );
+
+      await _db.from('exam_sessions').delete().eq('id', sid);
+      debugPrint('[ExamService] Deleted exam session $sid and related data');
+    } catch (e) {
+      if (e is ExamServiceException) rethrow;
+      _rethrowPostgrest(e, 'deleteExamSessionCompletely failed');
+    }
+  }
+
+  Future<void> _safeDeleteTable(
+    Future<dynamic> Function() deleteOp,
+    String tableName,
+  ) async {
+    try {
+      await deleteOp();
+    } on PostgrestException catch (e) {
+      if (e.code == '42P01' ||
+          e.message.toLowerCase().contains('does not exist')) {
+        debugPrint('[ExamService] skip delete on missing table $tableName');
+        return;
+      }
+      rethrow;
     }
   }
 

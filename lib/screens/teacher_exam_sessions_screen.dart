@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 import 'create_exam_session_screen.dart';
@@ -157,7 +158,7 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
       picked = choice;
     }
     if (!mounted) return;
-    await Navigator.push(
+    final deleted = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ExamRankingsScreen(
@@ -166,6 +167,7 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
         ),
       ),
     );
+    if (deleted == true) await _load();
   }
 
   @override
@@ -274,7 +276,7 @@ class _ExamActionTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: TeacherAttendanceUi.accentPurple),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
+        subtitle: Text(subtitle, style: ExamUi.bodySecondary(context)),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),

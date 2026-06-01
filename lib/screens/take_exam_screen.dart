@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/student_attendance_ui.dart';
 
@@ -104,9 +105,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: const Text('Unanswered questions'),
+          title: Text(
+            'Unanswered questions',
+            style: ExamUi.titleMedium(ctx),
+          ),
           content: Text(
             'You have $unanswered unanswered question(s). Submit anyway?',
+            style: ExamUi.body(ctx),
           ),
           actions: [
             TextButton(
@@ -126,9 +131,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: const Text('Submit exam?'),
-          content: const Text(
+          title: Text('Submit exam?', style: ExamUi.titleMedium(ctx)),
+          content: Text(
             'You cannot change answers after submitting.',
+            style: ExamUi.body(ctx),
           ),
           actions: [
             TextButton(
@@ -162,11 +168,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: const Text('Exam submitted'),
+          title: Text('Exam submitted', style: ExamUi.titleMedium(ctx)),
           content: Text(
             'Score: ${result.rawScore}/${result.totalPoints} '
             '(${result.percentageScore.toStringAsFixed(1)}%)\n'
-            'Time: ${ExamService.formatCompletionTime(result.completionSeconds)}',
+            'Time: ${ExamService.formatCompletionTime(result.completionSeconds)}\n'
+            'Submitted: ${ExamUi.formatExamDateTime(result.submittedAt)}',
+            style: ExamUi.body(ctx),
           ),
           actions: [
             FilledButton(
@@ -192,6 +200,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   @override
   Widget build(BuildContext context) {
     final hPad = AppBreakpoints.horizontalPadding(context);
+    final textTheme = Theme.of(context).textTheme;
 
     return Theme(
       data: StudentAttendanceUi.themeOverlay(Theme.of(context)),
@@ -221,26 +230,19 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                           children: [
                             Text(
                               widget.session.examTitle,
-                              style: const TextStyle(
+                              style: textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 17,
                               ),
                             ),
                             Text(
                               '${widget.session.examCode} • '
                               '${_questions.length} question(s)',
-                              style: const TextStyle(
-                                color: StudentAttendanceUi.textSecondary,
-                                fontSize: 12,
-                              ),
+                              style: ExamUi.bodySecondary(context),
                             ),
                             if (widget.session.durationMinutes > 0)
                               Text(
                                 'Suggested duration: ${widget.session.durationMinutes} min',
-                                style: const TextStyle(
-                                  color: StudentAttendanceUi.textSecondary,
-                                  fontSize: 11,
-                                ),
+                                style: ExamUi.bodySecondary(context),
                               ),
                           ],
                         ),
@@ -261,40 +263,36 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                   children: [
                                     Text(
                                       'Q${index + 1} (${q.points} pt${q.points == 1 ? '' : 's'})',
-                                      style: const TextStyle(
+                                      style: textTheme.labelLarge?.copyWith(
                                         fontWeight: FontWeight.w700,
-                                        fontSize: 13,
                                         color: StudentAttendanceUi.mint,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
                                       q.questionText,
-                                      style: const TextStyle(
+                                      style: textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
-                                        fontSize: 15,
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      children: q.choices.map((c) {
-                                        final picked = selected == c.id;
-                                        return ChoiceChip(
-                                          label: Text(c.choiceText),
-                                          selected: picked,
-                                          onSelected: _submitting
-                                              ? null
-                                              : (_) {
-                                                  setState(() {
-                                                    _selectedByQuestion[q.id] =
-                                                        c.id;
-                                                  });
-                                                },
-                                        );
-                                      }).toList(),
-                                    ),
+                                    ...q.choices.map((c) {
+                                      final picked = selected == c.id;
+                                      return ExamUi.mcqChoiceTile(
+                                        context: context,
+                                        letter: ExamUi.choiceLetterForOrder(
+                                          c.choiceOrder,
+                                        ),
+                                        choiceText: c.choiceText,
+                                        selected: picked,
+                                        enabled: !_submitting,
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedByQuestion[q.id] = c.id;
+                                          });
+                                        },
+                                      );
+                                    }),
                                   ],
                                 ),
                               ),
