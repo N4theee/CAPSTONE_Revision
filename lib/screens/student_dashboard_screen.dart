@@ -11,7 +11,7 @@ import '../ui/student_attendance_ui.dart';
 import '../widgets/course_dashboard_card.dart';
 import 'home_screen.dart';
 import 'student_history_screen.dart';
-import 'student_screen.dart';
+import 'student_subject_details_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key, required this.user});
@@ -515,7 +515,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                                           await Navigator.push<void>(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => StudentScreen(
+                                              builder: (_) =>
+                                                  StudentSubjectDetailsScreen(
                                                 studentId: widget.user.linkedId,
                                                 studentName: _displayName,
                                                 offering: o,

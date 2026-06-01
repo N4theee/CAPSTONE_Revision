@@ -13,6 +13,9 @@ class StudentAttendanceUi {
   static const Color mint = Color(0xFF5EEAD4);
   static const Color success = Color(0xFF34D399);
   static const Color textSecondary = Color(0xFF8B949E);
+  /// Brighter copy for hints, helpers, and field labels on dark fields.
+  static const Color textOnField = Color(0xFFE6EDF3);
+  static const Color hintOnField = Color(0xFFCBD5E1);
 
   /// Course tiles on student dashboard (cards in reference).
   static const Color dashboardGradientTop = Color(0xFF0D9488);
@@ -55,11 +58,20 @@ class StudentAttendanceUi {
         ),
       ),
       dividerTheme: const DividerThemeData(color: borderSubtle, thickness: 1),
+      textTheme: base.textTheme.apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,
-        labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
-        floatingLabelStyle: const TextStyle(color: mint),
+        labelStyle: const TextStyle(color: textOnField, fontSize: 14),
+        floatingLabelStyle: const TextStyle(color: mint, fontSize: 14),
+        hintStyle: const TextStyle(color: hintOnField, fontSize: 15),
+        helperStyle: const TextStyle(color: hintOnField, fontSize: 12),
+        errorStyle: const TextStyle(color: Color(0xFFFF8A80), fontSize: 12),
+        prefixIconColor: hintOnField,
+        suffixIconColor: hintOnField,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: accentTeal.withValues(alpha: 0.45)),
@@ -77,4 +89,8 @@ class StudentAttendanceUi {
       ),
     );
   }
+
+  /// Readable [TextField] on dark exam/attendance screens.
+  static TextStyle fieldTextStyle() =>
+      const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500);
 }

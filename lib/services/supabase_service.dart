@@ -1,10 +1,12 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'device_identity_service.dart';
 import '../util/db_timestamptz.dart';
+
+export 'exam_service.dart';
 
 class AppUser {
   const AppUser({
@@ -164,7 +166,7 @@ class EnrollmentRecord {
   final String section;
 
   String get label =>
-      '$studentName → $subjectCode $section ($teacherName)';
+      '$studentName â†’ $subjectCode $section ($teacherName)';
 }
 
 class AdminAttendanceReportItem {
@@ -240,7 +242,7 @@ class SupabaseService {
 
   final _db = Supabase.instance.client;
 
-  // ── AUTH + ADMIN ───────────────────────────────────────────
+  // â”€â”€ AUTH + ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<AppUser?> login({
     required String username,
@@ -721,7 +723,7 @@ class SupabaseService {
     );
   }
 
-  // ── TEACHER ATTENDANCE ─────────────────────────────────────
+  // â”€â”€ TEACHER ATTENDANCE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<Map<String, dynamic>> startSession({
     required String teacherId,
@@ -802,7 +804,7 @@ class SupabaseService {
     debugPrint('[DB] Session ended: $sessionId');
   }
 
-  // ── STUDENT ────────────────────────────────────────────────
+  // â”€â”€ STUDENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<Map<String, dynamic>?> getActiveSessionForOffering(
       String offeringId) async {
@@ -946,7 +948,7 @@ class SupabaseService {
     return anomalies;
   }
 
-  // Realtime stream — fires whenever session row changes
+  // Realtime stream â€” fires whenever session row changes
   Stream<bool> watchSessionActive(String sessionId) {
     return _db
         .from('attendance_sessions')

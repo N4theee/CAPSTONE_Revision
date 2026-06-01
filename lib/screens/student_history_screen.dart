@@ -9,9 +9,11 @@ class StudentHistoryScreen extends StatefulWidget {
   const StudentHistoryScreen({
     super.key,
     required this.studentId,
+    this.initialSubjectCode,
   });
 
   final String studentId;
+  final String? initialSubjectCode;
 
   @override
   State<StudentHistoryScreen> createState() => _StudentHistoryScreenState();
@@ -28,6 +30,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _subjectFilter = widget.initialSubjectCode;
     _load();
   }
 

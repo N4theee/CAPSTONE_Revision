@@ -5,7 +5,7 @@ import '../ui/responsive.dart';
 import '../widgets/course_dashboard_card.dart';
 import 'home_screen.dart';
 import 'teacher_history_screen.dart';
-import 'teacher_screen.dart';
+import 'teacher_subject_details_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
   const TeacherDashboardScreen({super.key, required this.user});
@@ -299,7 +299,8 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => TeacherScreen(
+                                              builder: (_) =>
+                                                  TeacherSubjectDetailsScreen(
                                                 teacherName: _displayName,
                                                 offering: o,
                                               ),

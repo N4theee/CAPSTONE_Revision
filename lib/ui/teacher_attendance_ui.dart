@@ -13,6 +13,8 @@ class TeacherAttendanceUi {
   static const Color absentOrange = Color(0xFFFF9800);
   static const Color anomalyRed = Color(0xFFF44336);
   static const Color textSecondary = Color(0xFFB0B3C0);
+  static const Color textOnField = Color(0xFFE8EAF0);
+  static const Color hintOnField = Color(0xFFD1D5E0);
 
   static ThemeData themeOverlay(ThemeData base) {
     final scheme = ColorScheme.dark(
@@ -54,11 +56,20 @@ class TeacherAttendanceUi {
           backgroundColor: WidgetStateProperty.all(surface),
         ),
       ),
+      textTheme: base.textTheme.apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,
-        labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
-        floatingLabelStyle: const TextStyle(color: accentPurple),
+        labelStyle: const TextStyle(color: textOnField, fontSize: 14),
+        floatingLabelStyle: const TextStyle(color: accentPurple, fontSize: 14),
+        hintStyle: const TextStyle(color: hintOnField, fontSize: 15),
+        helperStyle: const TextStyle(color: hintOnField, fontSize: 12),
+        errorStyle: const TextStyle(color: Color(0xFFFF8A80), fontSize: 12),
+        prefixIconColor: hintOnField,
+        suffixIconColor: hintOnField,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: accentPurple.withValues(alpha: 0.45)),
@@ -79,4 +90,7 @@ class TeacherAttendanceUi {
       ),
     );
   }
+
+  static TextStyle fieldTextStyle() =>
+      const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500);
 }
