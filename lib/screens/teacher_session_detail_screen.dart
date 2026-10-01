@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -109,8 +110,9 @@ class _TeacherSessionDetailScreenState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: TeacherAttendanceUi.textSecondary
-                          .withValues(alpha: 0.4),
+                      color: TeacherAttendanceUi.textSecondary.withValues(
+                        alpha: 0.4,
+                      ),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -128,8 +130,9 @@ class _TeacherSessionDetailScreenState
                 Text(
                   'Update attendance for this session',
                   style: TextStyle(
-                    color: TeacherAttendanceUi.textSecondary
-                        .withValues(alpha: 0.95),
+                    color: TeacherAttendanceUi.textSecondary.withValues(
+                      alpha: 0.95,
+                    ),
                     fontSize: 13,
                   ),
                 ),
@@ -187,143 +190,144 @@ class _TeacherSessionDetailScreenState
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Session Details'),
-      ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _detailsFuture,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(pad),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Failed to load attendees.\n${snap.error}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: _retry,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          final data = snap.data ?? const <String, dynamic>{};
-          final attendees =
-              (data['attendees'] as List<SessionAttendanceDetailItem>?) ??
-                  const <SessionAttendanceDetailItem>[];
-          final anomalies =
-              (data['anomalies'] as List<AttendanceAnomaly>?) ??
-                  const <AttendanceAnomaly>[];
-
-          if (attendees.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: EdgeInsets.all(pad),
-                child: const Text(
-                  'No enrolled students for this class section.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: TeacherAttendanceUi.textSecondary),
-                ),
-              ),
-            );
-          }
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final useWide = constraints.maxWidth >= 720;
-              final listPad = EdgeInsets.fromLTRB(pad, 0, pad, pad);
-
-              final header = Padding(
-                padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxW),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${widget.session.subjectCode} • Section ${widget.session.section}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Enrolled students — tap Edit to mark Present or Absent',
-                          style: TextStyle(
-                            color: TeacherAttendanceUi.textSecondary
-                                .withValues(alpha: 0.95),
-                            fontSize: 13,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
+      appBar: AppBar(title: const Text('Session Details')),
+      body: ResponsivePage(
+        maxWidth: 1040,
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _detailsFuture,
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snap.hasError) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(pad),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Failed to load attendees.\n${snap.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: _retry,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                    ],
                   ),
                 ),
               );
+            }
+            final data = snap.data ?? const <String, dynamic>{};
+            final attendees =
+                (data['attendees'] as List<SessionAttendanceDetailItem>?) ??
+                const <SessionAttendanceDetailItem>[];
+            final anomalies =
+                (data['anomalies'] as List<AttendanceAnomaly>?) ??
+                const <AttendanceAnomaly>[];
 
-              final anomalyBox = anomalies.isNotEmpty
-                  ? Padding(
-                      padding: EdgeInsets.fromLTRB(pad, 0, pad, 12),
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: maxW),
-                          child: _AnomalyBanner(anomalies: anomalies),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink();
+            if (attendees.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: EdgeInsets.all(pad),
+                  child: const Text(
+                    'No enrolled students for this class section.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: TeacherAttendanceUi.textSecondary),
+                  ),
+                ),
+              );
+            }
 
-              final list = ListView.separated(
-                padding: listPad,
-                itemCount: attendees.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 10),
-                itemBuilder: (_, i) {
-                  final detail = attendees[i];
-                  return Align(
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final useWide = constraints.maxWidth >= 720;
+                final listPad = EdgeInsets.fromLTRB(pad, 0, pad, pad);
+
+                final header = Padding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 8),
+                  child: Align(
                     alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxW),
-                      child: _AttendanceTile(
-                        detail: detail,
-                        wideLayout: useWide,
-                        isUpdating: _updatingStudentId == detail.studentId,
-                        onEdit: () => _showEditSheet(detail),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.session.subjectCode} • Section ${widget.session.section}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Enrolled students — tap Edit to mark Present or Absent',
+                            style: TextStyle(
+                              color: TeacherAttendanceUi.textSecondary
+                                  .withValues(alpha: 0.95),
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              );
+                  ),
+                );
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  header,
-                  anomalyBox,
-                  Expanded(child: list),
-                ],
-              );
-            },
-          );
-        },
+                final anomalyBox = anomalies.isNotEmpty
+                    ? Padding(
+                        padding: EdgeInsets.fromLTRB(pad, 0, pad, 12),
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxW),
+                            child: _AnomalyBanner(anomalies: anomalies),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink();
+
+                final list = ListView.separated(
+                  padding: listPad,
+                  itemCount: attendees.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final detail = attendees[i];
+                    return Align(
+                      alignment: Alignment.center,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxW),
+                        child: _AttendanceTile(
+                          detail: detail,
+                          wideLayout: useWide,
+                          isUpdating: _updatingStudentId == detail.studentId,
+                          onEdit: () => _showEditSheet(detail),
+                        ),
+                      ),
+                    );
+                  },
+                );
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    anomalyBox,
+                    Expanded(child: list),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -375,8 +379,9 @@ class _AnomalyBanner extends StatelessWidget {
                     Text(
                       'One device is being used by more than one student to mark attendance in this session.',
                       style: TextStyle(
-                        color: TeacherAttendanceUi.anomalyRed
-                            .withValues(alpha: 0.92),
+                        color: TeacherAttendanceUi.anomalyRed.withValues(
+                          alpha: 0.92,
+                        ),
                         fontSize: 13,
                         height: 1.4,
                       ),
@@ -405,8 +410,9 @@ class _AnomalyBanner extends StatelessWidget {
                   Text(
                     a.deviceLabel,
                     style: TextStyle(
-                      color: TeacherAttendanceUi.anomalyRed
-                          .withValues(alpha: 0.88),
+                      color: TeacherAttendanceUi.anomalyRed.withValues(
+                        alpha: 0.88,
+                      ),
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),

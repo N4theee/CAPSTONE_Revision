@@ -1,274 +1,320 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-
 import '../services/supabase_service.dart';
-import '../ui/responsive.dart';
+import '../ui/adaptive_layout.dart';
+import '../ui/exam_ui.dart';
 import 'exam_history_screen.dart';
 import 'join_exam_screen.dart';
 import 'student_history_screen.dart';
 import 'student_screen.dart';
 
-/// Subject hub: attendance, join exam, and history for one enrollment.
-class StudentSubjectDetailsScreen extends StatelessWidget {
+class StudentSubjectDetailsScreen extends StatefulWidget {
   const StudentSubjectDetailsScreen({
     super.key,
     required this.studentId,
     required this.studentName,
     required this.offering,
   });
-
   final String studentId;
   final String studentName;
   final SubjectOffering offering;
-
-  static const _gradientTop = Color(0xFF0D9488);
-  static const _gradientBottom = Color(0xFF115E59);
-  static const _card = Color(0xFF161B22);
-
   @override
-  Widget build(BuildContext context) {
-    final hPad = AppBreakpoints.horizontalPadding(context);
-    final courseTitle =
-        '${offering.subjectCode} - ${offering.subjectTitle}';
-
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_gradientTop, _gradientBottom],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back_rounded,
-                          color: Colors.white),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Subject Details',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _card,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              courseTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Section ${offering.section} • $studentName',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'What would you like to do?',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _OptionCard(
-                        icon: Icons.fact_check_rounded,
-                        title: 'Mark Attendance',
-                        subtitle: 'Join the teacher’s live attendance session',
-                        accent: const Color(0xFF14B8A6),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => StudentScreen(
-                                studentId: studentId,
-                                studentName: studentName,
-                                offering: offering,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _OptionCard(
-                        icon: Icons.quiz_rounded,
-                        title: 'Join Exam',
-                        subtitle: 'Enter exam code and stay in BLE range',
-                        accent: const Color(0xFF2563EB),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => JoinExamScreen(
-                                studentId: studentId,
-                                studentName: studentName,
-                                offering: offering,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _OptionCard(
-                        icon: Icons.history_rounded,
-                        title: 'Attendance History',
-                        subtitle: 'Past attendance for this subject',
-                        accent: const Color(0xFF0F766E),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => StudentHistoryScreen(
-                                studentId: studentId,
-                                initialSubjectCode: offering.subjectCode,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _OptionCard(
-                        icon: Icons.assignment_rounded,
-                        title: 'Exam History',
-                        subtitle: 'Past exam attempts for this class',
-                        accent: const Color(0xFF7C3AED),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ExamHistoryScreen(
-                                studentId: studentId,
-                                offering: offering,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  State<StudentSubjectDetailsScreen> createState() =>
+      _StudentSubjectDetailsScreenState();
 }
 
-class _OptionCard extends StatelessWidget {
-  const _OptionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
-  final VoidCallback onTap;
+class _StudentSubjectDetailsScreenState
+    extends State<StudentSubjectDetailsScreen> {
+  String? _studentNumber;
+  bool _loading = true;
+  bool _failed = false;
+  DateTime? _updatedAt;
+  List<StudentExamHistoryItem> _history = [];
+  int _limit = 10;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: StudentSubjectDetailsScreen._card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withValues(alpha: 0.4)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: accent, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right,
-                    color: Colors.white.withValues(alpha: 0.7)),
-              ],
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final number = await SupabaseService().getStudentNumber(widget.studentId);
+      final rows = await ExamService().getStudentExamHistory(
+        widget.studentId,
+        offeringId: widget.offering.id,
+        subjectCode: widget.offering.subjectCode,
+        subjectTitle: widget.offering.subjectTitle,
+        section: widget.offering.section,
+      );
+      if (!mounted) return;
+      setState(() {
+        _studentNumber = number;
+        _history = rows;
+        _loading = false;
+        _updatedAt = DateTime.now();
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _open(Widget page) async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+    if (mounted) await _load();
+  }
+
+  void _openHistory() => _open(
+    ExamHistoryScreen(studentId: widget.studentId, offering: widget.offering),
+  );
+
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: ExamUi.studentThemeOverlay(Theme.of(context)),
+    child: Builder(
+      builder: (context) => SubjectLayout(
+        title:
+            '${widget.offering.subjectCode} — ${widget.offering.subjectTitle}',
+        subtitle:
+            '${widget.studentName}\nSection ${widget.offering.section}\nStudent number: ${_studentNumber ?? (_loading ? 'Loading…' : 'Unavailable')}',
+        onRefresh: _load,
+        actions: [
+          SubjectAction(
+            'Mark attendance',
+            Icons.fact_check_outlined,
+            () => _open(
+              StudentScreen(
+                studentId: widget.studentId,
+                studentName: widget.studentName,
+                offering: widget.offering,
+              ),
             ),
           ),
+          SubjectAction(
+            'Join exam',
+            Icons.quiz_outlined,
+            () => _open(
+              JoinExamScreen(
+                studentId: widget.studentId,
+                studentName: widget.studentName,
+                offering: widget.offering,
+              ),
+            ),
+          ),
+          SubjectAction(
+            'Attendance history',
+            Icons.history,
+            () => _open(
+              StudentHistoryScreen(
+                studentId: widget.studentId,
+                initialSubjectCode: widget.offering.subjectCode,
+              ),
+            ),
+          ),
+          SubjectAction(
+            'Exam history',
+            Icons.assignment_outlined,
+            _openHistory,
+          ),
+        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AdaptiveHeading(
+              title: Text(
+                'Exam performance',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              action: DropdownButtonFormField<int>(
+                initialValue: _limit,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Show results'),
+                items: const [
+                  DropdownMenuItem(value: 5, child: Text('Latest 5')),
+                  DropdownMenuItem(value: 10, child: Text('Latest 10')),
+                  DropdownMenuItem(value: 0, child: Text('All results')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _limit = value);
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_failed)
+              LoadError(
+                message: 'Could not load your exam results.',
+                onRetry: _load,
+              )
+            else
+              _performance(context),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _openHistory,
+              icon: const Icon(Icons.history),
+              label: const Text('View full exam history'),
+            ),
+            if (_updatedAt != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  'Last updated: ${ExamUi.formatExamDateTime(_updatedAt)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _performance(BuildContext context) {
+    final completed = _history
+        .where((e) => e.status == 'completed' && e.percentageScore != null)
+        .toList();
+    final visible = (_limit == 0 ? completed : completed.take(_limit))
+        .toList()
+        .reversed
+        .toList();
+    if (visible.isEmpty) {
+      return const DetailCard(
+        title: 'No completed exams yet',
+        details: ['Your scores will appear here after you submit an exam.'],
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Score (%) by exam • oldest to newest'),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, box) {
+                final labelCount = (box.maxWidth / 80).floor().clamp(2, 8);
+                final interval = (visible.length / labelCount)
+                    .ceil()
+                    .clamp(1, visible.length)
+                    .toDouble();
+                return Semantics(
+                  label: 'Exam percentage chart. All values are listed below.',
+                  child: SizedBox(
+                    height:
+                        220 +
+                        40 *
+                            (MediaQuery.textScalerOf(context).scale(1) - 1)
+                                .clamp(0, 2),
+                    child: LineChart(
+                      LineChartData(
+                        minY: 0,
+                        maxY: 100,
+                        minX: -0.2,
+                        maxX: visible.length - 0.8,
+                        lineTouchData: LineTouchData(
+                          touchTooltipData: LineTouchTooltipData(
+                            fitInsideHorizontally: true,
+                            fitInsideVertically: true,
+                            maxContentWidth: box.maxWidth * 0.7,
+                            getTooltipItems: (spots) => spots
+                                .map(
+                                  (spot) => LineTooltipItem(
+                                    '${visible[spot.x.toInt()].examTitle}\n${spot.y.toStringAsFixed(1)}%',
+                                    const TextStyle(color: Colors.white),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: 25,
+                              reservedSize:
+                                  48 *
+                                  MediaQuery.textScalerOf(context).scale(1),
+                              getTitlesWidget: (value, meta) => Text(
+                                '${value.toInt()}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: interval,
+                              reservedSize:
+                                  36 *
+                                  MediaQuery.textScalerOf(context).scale(1),
+                              getTitlesWidget: (value, meta) {
+                                if (value != value.roundToDouble() ||
+                                    value < 0 ||
+                                    value >= visible.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Text(
+                                  'E${value.toInt() + 1}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        gridData: const FlGridData(drawVerticalLine: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: [
+                              for (var i = 0; i < visible.length; i++)
+                                FlSpot(
+                                  i.toDouble(),
+                                  visible[i].percentageScore!,
+                                ),
+                            ],
+                            color: Colors.tealAccent,
+                            barWidth: 3,
+                            isCurved: false,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            for (var i = 0; i < visible.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'E${i + 1} · ${visible[i].examTitle}\n${visible[i].percentageScore!.toStringAsFixed(1)}% · ${ExamUi.formatExamDateTime(visible[i].finishedAt)}',
+                ),
+              ),
+          ],
         ),
       ),
     );

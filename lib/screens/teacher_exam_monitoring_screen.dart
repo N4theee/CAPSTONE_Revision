@@ -1,8 +1,8 @@
+import '../ui/adaptive_layout.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
@@ -23,7 +23,8 @@ class TeacherExamMonitoringScreen extends StatefulWidget {
       _TeacherExamMonitoringScreenState();
 }
 
-class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScreen> {
+class _TeacherExamMonitoringScreenState
+    extends State<TeacherExamMonitoringScreen> {
   final _exam = ExamService();
   List<ExamAttemptMonitorRow> _attempts = [];
   final List<ExamAlertItem> _liveAlertFeed = [];
@@ -39,13 +40,10 @@ class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScree
     super.initState();
     _refresh();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
-    _alertSub = _exam.listenToExamAlerts(widget.session.id).listen(
-      (items) {
-        if (!mounted) return;
-        _onAlertsUpdated(items);
-      },
-      onError: (e) => debugPrint('[monitor] alerts: $e'),
-    );
+    _alertSub = _exam.listenToExamAlerts(widget.session.id).listen((items) {
+      if (!mounted) return;
+      _onAlertsUpdated(items);
+    }, onError: (e) => debugPrint('[monitor] alerts: $e'));
   }
 
   void _onAlertsUpdated(List<ExamAlertItem> items) {
@@ -212,192 +210,210 @@ class _TeacherExamMonitoringScreenState extends State<TeacherExamMonitoringScree
             ),
           ],
         ),
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await _refresh();
-            final items = await _exam.fetchExamAlerts(widget.session.id);
-            if (mounted) _onAlertsUpdated(items);
-          },
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.session.examTitle,
-                        style: ExamUi.titleMedium(context),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.session.examCode,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
+        body: ResponsivePage(
+          maxWidth: 1040,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _refresh();
+              final items = await _exam.fetchExamAlerts(widget.session.id);
+              if (mounted) _onAlertsUpdated(items);
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.session.examTitle,
+                          style: ExamUi.titleMedium(context),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${widget.offering.subjectCode} • Section ${widget.offering.section}',
-                        style: ExamUi.bodySecondary(context),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Status: ${widget.session.status} • '
-                        'RSSI ${widget.session.rssiThreshold} • '
-                        'Grace ${widget.session.gracePeriodSeconds}s',
-                        style: ExamUi.bodySecondary(context),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.session.examCode,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${widget.offering.subjectCode} • Section ${widget.offering.section}',
+                          style: ExamUi.bodySecondary(context),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Status: ${widget.session.status} • '
+                          'RSSI ${widget.session.rssiThreshold} • '
+                          'Grace ${widget.session.gracePeriodSeconds}s',
+                          style: ExamUi.bodySecondary(context),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (latestLive != null) ...[
-                const SizedBox(height: 12),
-                _LiveAlertCard(
-                  alert: latestLive,
-                  displayText: _alertDisplayText(latestLive),
-                  style: _alertStyle(latestLive.alertType),
-                  timeLabel: _fmtTime(latestLive.createdAt),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Icon(Icons.notifications_active_outlined,
-                      size: 18, color: TeacherAttendanceUi.accentPurple),
-                  const SizedBox(width: 6),
-                  const Text(
-                    'Live proximity alerts',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                if (latestLive != null) ...[
+                  const SizedBox(height: 12),
+                  _LiveAlertCard(
+                    alert: latestLive,
+                    displayText: _alertDisplayText(latestLive),
+                    style: _alertStyle(latestLive.alertType),
+                    timeLabel: _fmtTime(latestLive.createdAt),
                   ),
-                  const Spacer(),
-                  if (_alertSub != null)
-                    Text(
-                      'Realtime',
+                ],
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.notifications_active_outlined,
+                      size: 18,
+                      color: TeacherAttendanceUi.accentPurple,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Live proximity alerts',
                       style: TextStyle(
-                        color: TeacherAttendanceUi.presentGreen,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Updates when students leave or return to BLE range.',
-                style: TextStyle(
-                  color: TeacherAttendanceUi.textSecondary,
-                  fontSize: 12,
+                    if (_alertSub != null)
+                      Text(
+                        'Realtime',
+                        style: TextStyle(
+                          color: TeacherAttendanceUi.presentGreen,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              if (_liveAlertFeed.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(14),
-                    child: Text(
-                      'No proximity alerts yet. Alerts appear when a student goes out of exam range.',
-                      style: TextStyle(color: TeacherAttendanceUi.textSecondary),
-                    ),
-                  ),
-                )
-              else
-                ..._liveAlertFeed.map(
-                  (a) => _AlertHistoryTile(
-                    alert: a,
-                    displayText: _alertDisplayText(a),
-                    style: _alertStyle(a.alertType),
-                    timeLabel: _fmtTime(a.createdAt),
-                    compact: a.id != latestLive?.id,
+                const SizedBox(height: 6),
+                Text(
+                  'Updates when students leave or return to BLE range.',
+                  style: TextStyle(
+                    color: TeacherAttendanceUi.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Text(
-                    'Joined students',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${_attempts.length}',
-                    style: const TextStyle(
-                      color: TeacherAttendanceUi.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_attempts.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No students have joined this exam yet.',
-                      style: TextStyle(color: TeacherAttendanceUi.textSecondary),
-                    ),
-                  ),
-                )
-              else
-                ..._attempts.map(
-                  (row) => Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            _statusColor(row).withValues(alpha: 0.18),
-                        child: Icon(
-                          _statusIcon(row),
-                          color: _statusColor(row),
-                          size: 20,
+                const SizedBox(height: 8),
+                if (_liveAlertFeed.isEmpty)
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Text(
+                        'No proximity alerts yet. Alerts appear when a student goes out of exam range.',
+                        style: TextStyle(
+                          color: TeacherAttendanceUi.textSecondary,
                         ),
                       ),
-                      title: Text(
-                        row.studentName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else
+                  ..._liveAlertFeed.map(
+                    (a) => _AlertHistoryTile(
+                      alert: a,
+                      displayText: _alertDisplayText(a),
+                      style: _alertStyle(a.alertType),
+                      timeLabel: _fmtTime(a.createdAt),
+                      compact: a.id != latestLive?.id,
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      'Joined students',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
                       ),
-                      subtitle: Text(
-                        'Violations: ${row.violationCount}'
-                        '${row.startedAt != null ? ' • Joined ${_fmtTime(row.startedAt!)}' : ''}',
+                    ),
+                    Text(
+                      '${_attempts.length}',
+                      style: const TextStyle(
+                        color: TeacherAttendanceUi.textSecondary,
                       ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_attempts.isEmpty)
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'No students have joined this exam yet.',
+                        style: TextStyle(
+                          color: TeacherAttendanceUi.textSecondary,
                         ),
-                        decoration: BoxDecoration(
-                          color: _statusColor(row).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _statusColor(row)),
-                        ),
-                        child: Text(
-                          ExamService.studentMonitorStatusLabel(row),
-                          style: TextStyle(
+                      ),
+                    ),
+                  )
+                else
+                  ..._attempts.map(
+                    (row) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: _statusColor(
+                            row,
+                          ).withValues(alpha: 0.18),
+                          child: Icon(
+                            _statusIcon(row),
                             color: _statusColor(row),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          row.studentName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Violations: ${row.violationCount}'
+                          '${row.startedAt != null ? ' • Joined ${_fmtTime(row.startedAt!)}' : ''}',
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _statusColor(row).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: _statusColor(row)),
+                          ),
+                          child: Text(
+                            ExamService.studentMonitorStatusLabel(row),
+                            style: TextStyle(
+                              color: _statusColor(row),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

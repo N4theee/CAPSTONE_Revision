@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -29,125 +30,97 @@ class StudentAttendanceDetailScreen extends StatelessWidget {
     return Theme(
       data: overlay,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Attendance Details'),
-        ),
-        body: LayoutBuilder(
-          builder: (context, c) {
-          final narrow = c.maxWidth < 400;
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              pad,
-              12,
-              pad,
-              24 + MediaQuery.paddingOf(context).bottom,
-            ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxW),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _CourseHeaderCard(
-                      title: '${item.subjectCode} - ${item.subjectTitle}',
-                      sectionLine: 'Section ${item.section}',
-                      teacherLine: item.teacherName,
-                      narrow: narrow,
-                    ),
-                    const SizedBox(height: 14),
-                    narrow
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _TimeSummaryTile(
-                                icon: Icons.calendar_month_rounded,
-                                label: 'Class started',
-                                value: _fmt(item.sessionStartedAt),
-                              ),
-                              const SizedBox(height: 10),
-                              _TimeSummaryTile(
-                                icon: Icons.check_circle_outline_rounded,
-                                label: 'You attended',
-                                value: _fmt(item.markedAt),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: _TimeSummaryTile(
-                                  icon: Icons.calendar_month_rounded,
-                                  label: 'Class started',
-                                  value: _fmt(item.sessionStartedAt),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _TimeSummaryTile(
-                                  icon: Icons.check_circle_outline_rounded,
-                                  label: 'You attended',
-                                  value: _fmt(item.markedAt),
-                                ),
-                              ),
-                            ],
-                          ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Attendance summary',
-                      style: TextStyle(
-                        color: StudentAttendanceUi.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    LayoutBuilder(
-                      builder: (context, inner) {
-                        final ratio = inner.maxWidth < 340 ? 1.15 : 1.35;
-                        return GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: ratio,
-                          children: const [
-                            _StatMiniCard(
-                              label: 'Status',
-                              value: 'Present',
-                              icon: Icons.person_outline_rounded,
-                            ),
-                            _StatMiniCard(
-                              label: 'In range',
-                              value: 'Yes',
-                              icon: Icons.near_me_outlined,
-                            ),
-                            _StatMiniCard(
-                              label: 'Signal',
-                              value: 'Strong',
-                              icon: Icons.signal_cellular_alt_rounded,
-                            ),
-                            _StatMiniCard(
-                              label: 'Verified',
-                              value: 'Yes',
-                              icon: Icons.verified_user_outlined,
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    _HowItWorksCard(
-                      onMore: () => _showHowDialog(context),
-                    ),
-                  ],
+        appBar: AppBar(title: const Text('Attendance Details')),
+        body: ResponsivePage(
+          maxWidth: 1040,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final narrow = c.maxWidth < 400;
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  pad,
+                  12,
+                  pad,
+                  24 + MediaQuery.paddingOf(context).bottom,
                 ),
-              ),
-            ),
-          );
-        },
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxW),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _CourseHeaderCard(
+                          title: '${item.subjectCode} - ${item.subjectTitle}',
+                          sectionLine: 'Section ${item.section}',
+                          teacherLine: item.teacherName,
+                          narrow: narrow,
+                        ),
+                        const SizedBox(height: 14),
+                        narrow
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _TimeSummaryTile(
+                                    icon: Icons.calendar_month_rounded,
+                                    label: 'Class started',
+                                    value: _fmt(item.sessionStartedAt),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _TimeSummaryTile(
+                                    icon: Icons.check_circle_outline_rounded,
+                                    label: 'You attended',
+                                    value: _fmt(item.markedAt),
+                                  ),
+                                ],
+                              )
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _TimeSummaryTile(
+                                      icon: Icons.calendar_month_rounded,
+                                      label: 'Class started',
+                                      value: _fmt(item.sessionStartedAt),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _TimeSummaryTile(
+                                      icon: Icons.check_circle_outline_rounded,
+                                      label: 'You attended',
+                                      value: _fmt(item.markedAt),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Attendance summary',
+                          style: TextStyle(
+                            color: StudentAttendanceUi.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'Attendance recorded as present. Historical Bluetooth signal strength is not stored with this record.',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _HowItWorksCard(onMore: () => _showHowDialog(context)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -302,56 +275,6 @@ class _TimeSummaryTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatMiniCard extends StatelessWidget {
-  const _StatMiniCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: StudentAttendanceUi.surfaceElevated,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: StudentAttendanceUi.mint, size: 22),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: StudentAttendanceUi.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                color: StudentAttendanceUi.success,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ],

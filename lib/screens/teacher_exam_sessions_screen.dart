@@ -1,6 +1,6 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
-import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
@@ -29,6 +29,7 @@ class TeacherExamSessionsScreen extends StatefulWidget {
 class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
   final _exam = ExamService();
   bool _loading = true;
+  bool _loadFailed = false;
   ExamSession? _activeOrScheduled;
 
   @override
@@ -38,14 +39,27 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final session =
-        await _exam.getActiveExamSessionForOffering(widget.offering.id);
-    if (!mounted) return;
     setState(() {
-      _activeOrScheduled = session;
-      _loading = false;
+      _loading = true;
+      _loadFailed = false;
     });
+    try {
+      final session = await _exam.getActiveExamSessionForOffering(
+        widget.offering.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _activeOrScheduled = session;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = true;
+        });
+      }
+    }
   }
 
   void _toast(String msg) {
@@ -56,9 +70,7 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
     final created = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => CreateExamSessionScreen(
-          offering: widget.offering,
-        ),
+        builder: (_) => CreateExamSessionScreen(offering: widget.offering),
       ),
     );
     if (created == true) await _load();
@@ -161,10 +173,8 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
     final deleted = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => ExamRankingsScreen(
-          offering: widget.offering,
-          session: picked,
-        ),
+        builder: (_) =>
+            ExamRankingsScreen(offering: widget.offering, session: picked),
       ),
     );
     if (deleted == true) await _load();
@@ -179,76 +189,84 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
     return Theme(
       data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Exam Sessions'),
-        ),
-        body: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
-            children: [
-              Text(
-                course,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              Text(
-                'Section ${widget.offering.section}',
-                style: const TextStyle(
-                  color: TeacherAttendanceUi.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_activeOrScheduled != null) ...[
-                const SizedBox(height: 16),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.sensors_rounded,
-                        color: TeacherAttendanceUi.accentPurple),
-                    title: Text(
-                      _activeOrScheduled!.examTitle,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      '${_activeOrScheduled!.examCode} • ${_activeOrScheduled!.status}',
-                    ),
+        appBar: AppBar(title: const Text('Exam Sessions')),
+        body: ResponsivePage(
+          maxWidth: 1040,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
+              children: [
+                Text(
+                  course,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
                   ),
                 ),
+                Text(
+                  'Section ${widget.offering.section}',
+                  style: const TextStyle(
+                    color: TeacherAttendanceUi.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_loadFailed)
+                  LoadError(
+                    message: 'Could not load exam sessions.',
+                    onRetry: _load,
+                  )
+                else if (_activeOrScheduled != null) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.sensors_rounded,
+                        color: TeacherAttendanceUi.accentPurple,
+                      ),
+                      title: Text(
+                        _activeOrScheduled!.examTitle,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${_activeOrScheduled!.examCode} • ${_activeOrScheduled!.status}',
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                _ExamActionTile(
+                  icon: Icons.add_circle_outline,
+                  title: 'Create Exam Session',
+                  subtitle: 'Set title, schedule, BLE, and proximity rules',
+                  onTap: _openCreate,
+                ),
+                _ExamActionTile(
+                  icon: Icons.visibility_outlined,
+                  title: 'View Active Exam Session',
+                  subtitle: 'Exam code, schedule, and session status',
+                  onTap: _openActive,
+                ),
+                _ExamActionTile(
+                  icon: Icons.monitor_heart_outlined,
+                  title: 'Monitor Exam',
+                  subtitle: 'Live students, proximity, and alerts',
+                  onTap: _openMonitor,
+                ),
+                _ExamActionTile(
+                  icon: Icons.leaderboard_outlined,
+                  title: 'View Exam Rankings',
+                  subtitle: 'Scores and ranks for completed exams',
+                  onTap: _openRankings,
+                ),
               ],
-              const SizedBox(height: 20),
-              _ExamActionTile(
-                icon: Icons.add_circle_outline,
-                title: 'Create Exam Session',
-                subtitle: 'Set title, schedule, BLE, and proximity rules',
-                onTap: _openCreate,
-              ),
-              _ExamActionTile(
-                icon: Icons.visibility_outlined,
-                title: 'View Active Exam Session',
-                subtitle: 'Exam code, schedule, and session status',
-                onTap: _openActive,
-              ),
-              _ExamActionTile(
-                icon: Icons.monitor_heart_outlined,
-                title: 'Monitor Exam',
-                subtitle: 'Live students, proximity, and alerts',
-                onTap: _openMonitor,
-              ),
-              _ExamActionTile(
-                icon: Icons.leaderboard_outlined,
-                title: 'View Exam Rankings',
-                subtitle: 'Scores and ranks for completed exams',
-                onTap: _openRankings,
-              ),
-            ],
+            ),
           ),
         ),
       ),

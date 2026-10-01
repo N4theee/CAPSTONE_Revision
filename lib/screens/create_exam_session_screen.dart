@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,10 +9,7 @@ import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
 
 class CreateExamSessionScreen extends StatefulWidget {
-  const CreateExamSessionScreen({
-    super.key,
-    required this.offering,
-  });
+  const CreateExamSessionScreen({super.key, required this.offering});
 
   final SubjectOffering offering;
 
@@ -24,9 +22,7 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
   final _exam = ExamService();
   final _titleCtrl = TextEditingController();
   final _durationCtrl = TextEditingController(text: '60');
-  final _rssiCtrl = TextEditingController(
-    text: '${AppConfig.rssiThreshold}',
-  );
+  final _rssiCtrl = TextEditingController(text: '${AppConfig.rssiThreshold}');
   final _graceCtrl = TextEditingController(text: '30');
 
   bool _saving = false;
@@ -97,7 +93,13 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
       ),
     );
     if (time == null || !mounted) return;
-    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final dt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     setState(() {
       if (isStart) {
         _startsAt = dt;
@@ -262,179 +264,185 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
       data: ExamUi.teacherThemeOverlay(Theme.of(context)),
       child: Scaffold(
         appBar: AppBar(title: const Text('Create Exam Session')),
-        body: _saving
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
-                children: [
-                  Text(
-                    widget.offering.label,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+        body: ResponsivePage(
+          maxWidth: 800,
+          child: _saving
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
+                  children: [
+                    Text(
+                      widget.offering.label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Offering is pre-selected for this class',
-                    style: TextStyle(
-                      color: TeacherAttendanceUi.textSecondary,
-                      fontSize: 12,
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Offering is pre-selected for this class',
+                      style: TextStyle(
+                        color: TeacherAttendanceUi.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _titleCtrl,
-                    style: TeacherAttendanceUi.fieldTextStyle(),
-                    cursorColor: TeacherAttendanceUi.accentPurple,
-                    decoration: const InputDecoration(
-                      labelText: 'Exam title',
-                      hintText: 'Midterm — Room 201',
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _titleCtrl,
+                      style: TeacherAttendanceUi.fieldTextStyle(),
+                      cursorColor: TeacherAttendanceUi.accentPurple,
+                      decoration: const InputDecoration(
+                        labelText: 'Exam title',
+                        hintText: 'Midterm — Room 201',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _durationCtrl,
-                    style: TeacherAttendanceUi.fieldTextStyle(),
-                    cursorColor: TeacherAttendanceUi.accentPurple,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: 'Duration (minutes)',
-                      helperText: 'Suggested time limit for students',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _durationCtrl,
+                      style: TeacherAttendanceUi.fieldTextStyle(),
+                      cursorColor: TeacherAttendanceUi.accentPurple,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Duration (minutes)',
+                        helperText: 'Suggested time limit for students',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Schedule start time',
-                      style: ExamUi.titleMedium(context),
-                    ),
-                    subtitle: Text(
-                      'If off, exam is active immediately when created',
-                      style: ExamUi.bodySecondary(context),
-                    ),
-                    value: _useSchedule,
-                    onChanged: (v) => setState(() {
-                      _useSchedule = v;
-                      if (!v) _startsAt = null;
-                    }),
-                  ),
-                  if (_useSchedule)
-                    ListTile(
+                    const SizedBox(height: 16),
+                    SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text('Start time', style: ExamUi.titleMedium(context)),
+                      title: Text(
+                        'Schedule start time',
+                        style: ExamUi.titleMedium(context),
+                      ),
                       subtitle: Text(
-                        _startsAt == null
-                            ? 'Not set'
-                            : ExamUi.formatExamDateTime(_startsAt),
+                        'If off, exam is active immediately when created',
                         style: ExamUi.bodySecondary(context),
                       ),
-                      trailing: const Icon(Icons.calendar_today_outlined),
-                      onTap: () => _pickDateTime(isStart: true),
+                      value: _useSchedule,
+                      onChanged: (v) => setState(() {
+                        _useSchedule = v;
+                        if (!v) _startsAt = null;
+                      }),
                     ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'End time (optional)',
-                      style: ExamUi.titleMedium(context),
-                    ),
-                    subtitle: Text(
-                      _endsAt == null
-                          ? 'Not set'
-                          : ExamUi.formatExamDateTime(_endsAt),
-                      style: ExamUi.bodySecondary(context),
-                    ),
-                    trailing: const Icon(Icons.event_outlined),
-                    onTap: () => _pickDateTime(isStart: false),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'BLE UUID (from subject offering)',
-                    style: TextStyle(
-                      color: TeacherAttendanceUi.textSecondary.withValues(
-                        alpha: 0.9,
+                    if (_useSchedule)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          'Start time',
+                          style: ExamUi.titleMedium(context),
+                        ),
+                        subtitle: Text(
+                          _startsAt == null
+                              ? 'Not set'
+                              : ExamUi.formatExamDateTime(_startsAt),
+                          style: ExamUi.bodySecondary(context),
+                        ),
+                        trailing: const Icon(Icons.calendar_today_outlined),
+                        onTap: () => _pickDateTime(isStart: true),
                       ),
-                      fontSize: 12,
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'End time (optional)',
+                        style: ExamUi.titleMedium(context),
+                      ),
+                      subtitle: Text(
+                        _endsAt == null
+                            ? 'Not set'
+                            : ExamUi.formatExamDateTime(_endsAt),
+                        style: ExamUi.bodySecondary(context),
+                      ),
+                      trailing: const Icon(Icons.event_outlined),
+                      onTap: () => _pickDateTime(isStart: false),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _bleUuid.isEmpty ? 'Not configured' : _bleUuid,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
+                    const SizedBox(height: 8),
+                    Text(
+                      'BLE UUID (from subject offering)',
+                      style: TextStyle(
+                        color: TeacherAttendanceUi.textSecondary.withValues(
+                          alpha: 0.9,
+                        ),
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _rssiCtrl,
-                    style: TeacherAttendanceUi.fieldTextStyle(),
-                    cursorColor: TeacherAttendanceUi.accentPurple,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: 'RSSI threshold',
-                      helperText:
-                          'Matches attendance default (${AppConfig.rssiThreshold}). '
-                          'More negative = farther range.',
+                    const SizedBox(height: 6),
+                    Text(
+                      _bleUuid.isEmpty ? 'Not configured' : _bleUuid,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _graceCtrl,
-                    style: TeacherAttendanceUi.fieldTextStyle(),
-                    cursorColor: TeacherAttendanceUi.accentPurple,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: 'Grace period (seconds)',
-                      helperText: 'Default 30',
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _rssiCtrl,
+                      style: TeacherAttendanceUi.fieldTextStyle(),
+                      cursorColor: TeacherAttendanceUi.accentPurple,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^-?\d*')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'RSSI threshold',
+                        helperText:
+                            'Matches attendance default (${AppConfig.rssiThreshold}). '
+                            'More negative = farther range.',
+                      ),
                     ),
-                  ),
-                  const Divider(height: 32),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Multiple-choice questions',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _graceCtrl,
+                      style: TeacherAttendanceUi.fieldTextStyle(),
+                      cursorColor: TeacherAttendanceUi.accentPurple,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Grace period (seconds)',
+                        helperText: 'Default 30',
+                      ),
+                    ),
+                    const Divider(height: 32),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Multiple-choice questions',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _addQuestion,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...List.generate(_questions.length, (qi) {
-                    final draft = _questions[qi];
-                    return _QuestionEditorCard(
-                      key: _questionEditorKeys[qi],
-                      index: qi,
-                      draft: draft,
-                      onRemove: () => _removeQuestion(qi),
-                      onChanged: () => setState(() {}),
-                    );
-                  }),
-                  const SizedBox(height: 28),
-                  FilledButton(
-                    onPressed: _save,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 4),
-                      child: Text('Create exam & questions'),
+                        TextButton.icon(
+                          onPressed: _addQuestion,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add'),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 8),
+                    ...List.generate(_questions.length, (qi) {
+                      final draft = _questions[qi];
+                      return _QuestionEditorCard(
+                        key: _questionEditorKeys[qi],
+                        index: qi,
+                        draft: draft,
+                        onRemove: () => _removeQuestion(qi),
+                        onChanged: () => setState(() {}),
+                      );
+                    }),
+                    const SizedBox(height: 28),
+                    FilledButton(
+                      onPressed: _save,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('Create exam & questions'),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -512,11 +520,12 @@ class _QuestionEditorCardState extends State<_QuestionEditorCard> {
           children: [
             Row(
               children: [
-                Text(
-                  'Question ${widget.index + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                Expanded(
+                  child: Text(
+                    'Question ${widget.index + 1}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
-                const Spacer(),
                 IconButton(
                   tooltip: 'Remove question',
                   onPressed: widget.onRemove,
@@ -526,6 +535,10 @@ class _QuestionEditorCardState extends State<_QuestionEditorCard> {
             ),
             TextField(
               controller: _questionCtrl,
+              minLines: 2,
+              maxLines: 6,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
               style: TeacherAttendanceUi.fieldTextStyle(),
               decoration: const InputDecoration(
                 labelText: 'Question text',
@@ -582,6 +595,9 @@ class _QuestionEditorCardState extends State<_QuestionEditorCard> {
                       padding: const EdgeInsets.only(top: 10),
                       child: TextField(
                         controller: _choiceCtrls[ci],
+                        minLines: 1,
+                        maxLines: 4,
+                        keyboardType: TextInputType.multiline,
                         style: TeacherAttendanceUi.fieldTextStyle(),
                         decoration: InputDecoration(
                           labelText: _labels[ci],

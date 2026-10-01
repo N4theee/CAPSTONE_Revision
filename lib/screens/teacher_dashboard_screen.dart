@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../ui/responsive.dart';
+import '../ui/adaptive_layout.dart';
 import '../widgets/course_dashboard_card.dart';
+import '../widgets/proxamity_mark.dart';
 import 'home_screen.dart';
-import 'teacher_history_screen.dart';
 import 'teacher_subject_details_screen.dart';
 
 class TeacherDashboardScreen extends StatefulWidget {
@@ -13,13 +14,13 @@ class TeacherDashboardScreen extends StatefulWidget {
   final AppUser user;
 
   @override
-  State<TeacherDashboardScreen> createState() =>
-      _TeacherDashboardScreenState();
+  State<TeacherDashboardScreen> createState() => _TeacherDashboardScreenState();
 }
 
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   final _db = SupabaseService();
   bool _loading = true;
+  bool _loadFailed = false;
   List<SubjectOffering> _offerings = [];
   Map<String, int> _enrollmentByOffering = {};
   late String _displayName;
@@ -37,16 +38,29 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   }
 
   Future<void> _load() async {
-    final rows = await _db.getTeacherOfferings(widget.user.linkedId);
-    final counts = await _db.getEnrollmentCountsForOfferings(
-      rows.map((e) => e.id).toList(),
-    );
-    if (mounted) {
-      setState(() {
-        _offerings = rows;
-        _enrollmentByOffering = counts;
-        _loading = false;
-      });
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
+    try {
+      final rows = await _db.getTeacherOfferings(widget.user.linkedId);
+      final counts = await _db.getEnrollmentCountsForOfferings(
+        rows.map((e) => e.id).toList(),
+      );
+      if (mounted) {
+        setState(() {
+          _offerings = rows;
+          _enrollmentByOffering = counts;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadFailed = true;
+        });
+      }
     }
   }
 
@@ -80,9 +94,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     );
     if (!mounted) return;
     setState(() => _displayName = value);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Name updated.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Name updated.')));
   }
 
   void _signOut() {
@@ -90,16 +104,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       context,
       MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
-    );
-  }
-
-  void _openHistory() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            TeacherHistoryScreen(teacherId: widget.user.linkedId),
-      ),
     );
   }
 
@@ -117,7 +121,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: const Text(
-              'Attendximity',
+              'Proxamity',
               maxLines: 1,
               style: TextStyle(
                 color: Colors.white,
@@ -143,8 +147,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 _editName();
               } else if (v == 'refresh' && !_loading) {
                 _load();
-              } else if (v == 'history') {
-                _openHistory();
               } else if (v == 'logout') {
                 _signOut();
               }
@@ -155,10 +157,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                 value: 'refresh',
                 enabled: !_loading,
                 child: const Text('Refresh'),
-              ),
-              const PopupMenuItem(
-                value: 'history',
-                child: Text('Session history'),
               ),
               const PopupMenuItem(value: 'logout', child: Text('Sign out')),
             ],
@@ -181,11 +179,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           icon: Icon(Icons.refresh_rounded, color: iconColor),
         ),
         IconButton(
-          tooltip: 'Session History',
-          onPressed: _openHistory,
-          icon: Icon(Icons.history_rounded, color: iconColor),
-        ),
-        IconButton(
           tooltip: 'Sign out',
           onPressed: _signOut,
           icon: Icon(Icons.logout_rounded, color: iconColor),
@@ -197,124 +190,124 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final pad = AppBreakpoints.horizontalPadding(context);
-    final cols = AppBreakpoints.courseGridColumns(context);
-    final aspect = AppBreakpoints.courseGridChildAspectRatio(context, cols);
     final w = AppBreakpoints.width(context);
     final markSize = (w * 0.28).clamp(72.0, 120.0);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_gradientTop, _gradientBottom],
+      body: ResponsivePage(
+        maxWidth: 1200,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [_gradientTop, _gradientBottom],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: -20,
-                child: IgnorePointer(
-                  child: Text(
-                    'ATX',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Sceageus',
-                      fontSize: markSize,
-                      fontWeight: FontWeight.w900,
-                      height: 0.85,
-                      color: Colors.white.withValues(alpha: 0.07),
+          child: SafeArea(
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: -20,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: ProxamityMark(
+                        width: markSize * 2,
+                        color: Colors.white.withValues(alpha: 0.07),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: pad, vertical: 8),
-                    child: _buildHeader(),
-                  ),
-                  Expanded(
-                    child: _loading
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                            ),
-                          )
-                        : RefreshIndicator(
-                            color: _gradientTop,
-                            onRefresh: _load,
-                            child: _offerings.isEmpty
-                                ? ListView(
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(),
-                                    children: const [
-                                      SizedBox(height: 120),
-                                      Center(
-                                        child: Text(
-                                          'No courses yet.',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 16,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: pad,
+                        vertical: 8,
+                      ),
+                      child: _buildHeader(),
+                    ),
+                    Expanded(
+                      child: _loading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : RefreshIndicator(
+                              color: _gradientTop,
+                              onRefresh: _load,
+                              child: _loadFailed
+                                  ? LoadError(
+                                      message: 'Could not load your courses.',
+                                      onRetry: _load,
+                                    )
+                                  : _offerings.isEmpty
+                                  ? ListView(
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      children: const [
+                                        SizedBox(height: 120),
+                                        Center(
+                                          child: Text(
+                                            'No courses yet.',
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 16,
+                                            ),
                                           ),
                                         ),
+                                      ],
+                                    )
+                                  : ResponsiveCourseGrid(
+                                      padding: EdgeInsets.fromLTRB(
+                                        pad,
+                                        8,
+                                        pad,
+                                        32,
                                       ),
-                                    ],
-                                  )
-                                : GridView.builder(
-                                    padding: EdgeInsets.fromLTRB(
-                                        pad, 8, pad, 32),
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: cols,
-                                      mainAxisSpacing: 14,
-                                      crossAxisSpacing: 14,
-                                      childAspectRatio: aspect,
-                                    ),
-                                    itemCount: _offerings.length,
-                                    itemBuilder: (_, i) {
-                                      final o = _offerings[i];
-                                      final n =
-                                          _enrollmentByOffering[o.id] ?? 0;
-                                      return CourseDashboardCard(
-                                        title:
-                                            '${o.subjectCode} - ${o.subjectTitle}',
-                                        sectionLine: 'Section ${o.section}',
-                                        footerLine:
-                                            '$n ${n == 1 ? 'student' : 'students'}',
-                                        cardTop: _cardTop,
-                                        cardTopBorder: _cardTopBorder,
-                                        footerBar: Colors.black,
-                                        footerText: Colors.white,
-                                        chevron: Colors.white,
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  TeacherSubjectDetailsScreen(
-                                                teacherName: _displayName,
-                                                offering: o,
+                                      physics:
+                                          const AlwaysScrollableScrollPhysics(),
+                                      itemCount: _offerings.length,
+                                      itemBuilder: (_, i) {
+                                        final o = _offerings[i];
+                                        final n =
+                                            _enrollmentByOffering[o.id] ?? 0;
+                                        return CourseDashboardCard(
+                                          title:
+                                              '${o.subjectCode} - ${o.subjectTitle}',
+                                          sectionLine: 'Section ${o.section}',
+                                          footerLine:
+                                              '$n ${n == 1 ? 'student' : 'students'}',
+                                          cardTop: _cardTop,
+                                          cardTopBorder: _cardTopBorder,
+                                          footerBar: Colors.black,
+                                          footerText: Colors.white,
+                                          chevron: Colors.white,
+                                          onTap: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    TeacherSubjectDetailsScreen(
+                                                      teacherName: _displayName,
+                                                      offering: o,
+                                                    ),
                                               ),
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                          ),
-                  ),
-                ],
-              ),
-            ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                            ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -25,6 +26,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   bool _creatingOffering = false;
   bool _enrolling = false;
   bool _loadingLists = true;
+  bool _listsFailed = false;
   bool _loadingReport = false;
   List<StudentBasic> _students = [];
   List<TeacherBasic> _teachers = [];
@@ -56,7 +58,12 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     fontSize: 15,
   );
 
-  Text _dropdownLabel(String text) => Text(text, style: _dropdownTextStyle);
+  Text _dropdownLabel(String text) => Text(
+    text,
+    style: _dropdownTextStyle,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+  );
 
   @override
   void initState() {
@@ -94,9 +101,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       await _loadLists();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Create failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Create failed: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -126,9 +133,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       await _loadLists();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Create class failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Create class failed: $e')));
     } finally {
       if (mounted) setState(() => _creatingOffering = false);
     }
@@ -143,45 +150,51 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     setState(() {
       _beaconUuidOptions = next.toList();
       _beaconUuidOptions.sort();
-      _selectedBeaconUuid =
-          _beaconUuidOptions.isEmpty ? null : _beaconUuidOptions.first;
+      _selectedBeaconUuid = _beaconUuidOptions.isEmpty
+          ? null
+          : _beaconUuidOptions.first;
     });
   }
 
   Future<void> _loadLists() async {
-    setState(() => _loadingLists = true);
+    setState(() {
+      _loadingLists = true;
+      _listsFailed = false;
+    });
     try {
       final students = await _db.getAllStudents();
       final teachersList = await _db.getAllTeachers();
       final offerings = await _db.getAllOfferings();
       final enrollments = await _db.getAdminEnrollments();
       if (!mounted) return;
-      final selectedTeacherId = teachersList.any((p) => p.id == _selectedTeacherId)
+      final selectedTeacherId =
+          teachersList.any((p) => p.id == _selectedTeacherId)
           ? _selectedTeacherId
           : (teachersList.isNotEmpty ? teachersList.first.id : null);
       final offeringsByTeacher = selectedTeacherId == null
           ? <SubjectOffering>[]
           : offerings.where((o) => o.teacherId == selectedTeacherId).toList();
-      final subjectCodes = offeringsByTeacher
-          .map((o) => o.subjectCode)
-          .toSet()
-          .toList()
-        ..sort();
+      final subjectCodes =
+          offeringsByTeacher.map((o) => o.subjectCode).toSet().toList()..sort();
       final selectedSubjectCode = subjectCodes.contains(_selectedSubjectCode)
           ? _selectedSubjectCode
           : (subjectCodes.isNotEmpty ? subjectCodes.first : null);
-      final sections = offeringsByTeacher
-          .where((o) => o.subjectCode == selectedSubjectCode)
-          .map((o) => o.section)
-          .toSet()
-          .toList()
-        ..sort();
+      final sections =
+          offeringsByTeacher
+              .where((o) => o.subjectCode == selectedSubjectCode)
+              .map((o) => o.section)
+              .toSet()
+              .toList()
+            ..sort();
       final selectedSection = sections.contains(_selectedSection)
           ? _selectedSection
           : (sections.isNotEmpty ? sections.first : null);
       final selectedOfferingId = offeringsByTeacher
-          .where((o) =>
-              o.subjectCode == selectedSubjectCode && o.section == selectedSection)
+          .where(
+            (o) =>
+                o.subjectCode == selectedSubjectCode &&
+                o.section == selectedSection,
+          )
           .map((o) => o.id)
           .cast<String?>()
           .firstWhere((_) => true, orElse: () => null);
@@ -193,8 +206,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
         _enrollments = enrollments;
         _selectedOfferingTeacherId =
             teachersList.any((p) => p.id == _selectedOfferingTeacherId)
-                ? _selectedOfferingTeacherId
-                : (teachersList.isNotEmpty ? teachersList.first.id : null);
+            ? _selectedOfferingTeacherId
+            : (teachersList.isNotEmpty ? teachersList.first.id : null);
         _selectedStudentId = students.any((s) => s.id == _selectedStudentId)
             ? _selectedStudentId
             : (students.isNotEmpty ? students.first.id : null);
@@ -206,6 +219,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       if (_beaconUuidOptions.isEmpty) {
         _regenBeaconUuids();
       }
+    } catch (_) {
+      if (mounted) setState(() => _listsFailed = true);
     } finally {
       if (mounted) setState(() => _loadingLists = false);
     }
@@ -226,9 +241,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       await _loadLists();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enrollment failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Enrollment failed: $e')));
     } finally {
       if (mounted) setState(() => _enrolling = false);
     }
@@ -242,15 +257,15 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     try {
       await _db.removeEnrollment(studentId: parts[0], offeringId: parts[1]);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enrollment removed.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enrollment removed.')));
       await _loadLists();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Remove failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Remove failed: $e')));
     } finally {
       if (mounted) setState(() => _enrolling = false);
     }
@@ -273,9 +288,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Report generation failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Report generation failed: $e')));
     } finally {
       if (mounted) setState(() => _loadingReport = false);
     }
@@ -297,9 +312,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   Widget build(BuildContext context) {
     if (!kIsWeb) {
       return const Scaffold(
-        body: Center(
-          child: Text('Admin panel is web-only.'),
-        ),
+        body: Center(child: Text('Admin panel is web-only.')),
       );
     }
     final theme = Theme.of(context);
@@ -360,14 +373,18 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
           backgroundColor: _accent,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.white,
           side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
       ),
@@ -382,9 +399,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     );
 
     final screenW = MediaQuery.sizeOf(context).width;
-    final contentMaxW =
-        screenW > 960 ? 900.0 : (screenW - 24).clamp(300.0, 900.0);
-    final gutter = ((screenW - contentMaxW) / 2).clamp(12.0, 48.0);
+    const contentMaxW = 1100.0;
+    final gutter = screenW < 600 ? 12.0 : 24.0;
 
     return Theme(
       data: dark,
@@ -403,11 +419,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                _bg,
-                _bg,
-                _accent.withValues(alpha: 0.10),
-              ],
+              colors: [_bg, _bg, _accent.withValues(alpha: 0.10)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -418,130 +430,147 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
               child: ListView(
                 padding: EdgeInsets.fromLTRB(gutter, 20, gutter, 40),
                 children: [
-              Card(
-                color: _card,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: _border),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Create Teacher Account',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Teacher Full Name',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _userCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Teacher Username',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _passCtrl,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Teacher Password',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _maxStudentsCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Max Students (default 30)',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Section assignment is per class offering and student enrollment. Login email is the teacher username.',
-                        style: TextStyle(fontSize: 12, color: _muted),
-                      ),
-                      const SizedBox(height: 10),
-                      FilledButton.icon(
-                        onPressed: _loading ? null : _createTeacher,
-                        icon: _loading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.person_add_alt_1),
-                        label: const Text('Create Teacher'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Card(
-                color: _card,
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Create Class Section (Subject Offering)',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<String>(
-                        value: _selectedOfferingTeacherId,
-                        style: _dropdownTextStyle,
-                        dropdownColor: _card,
-                        decoration: const InputDecoration(
-                          labelText: 'Teacher (owner of this class)',
-                        ),
-                        items: _teachers
-                            .map(
-                              (p) => DropdownMenuItem(
-                                value: p.id,
-                                child: _dropdownLabel(p.fullName),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) =>
-                            setState(() => _selectedOfferingTeacherId = v),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _subjectCodeCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Subject Code (ex: IT401)',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _subjectTitleCtrl,
-                        decoration: const InputDecoration(labelText: 'Subject Title'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _sectionCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Section (ex: BSIT-4A)',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
+                  if (_listsFailed)
+                    LoadError(
+                      message: 'Could not load admin records.',
+                      onRetry: _loadLists,
+                    ),
+                  Card(
+                    color: _card,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: _border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedBeaconUuid,
+                          const Text(
+                            'Create Teacher Account',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _nameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Teacher Full Name',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _userCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Teacher Username',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _passCtrl,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Teacher Password',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _maxStudentsCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Max Students (default 30)',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Section assignment is per class offering and student enrollment. Login email is the teacher username.',
+                            style: TextStyle(fontSize: 12, color: _muted),
+                          ),
+                          const SizedBox(height: 10),
+                          FilledButton.icon(
+                            onPressed: _loading ? null : _createTeacher,
+                            icon: _loading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.person_add_alt_1),
+                            label: const Text('Create Teacher'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Card(
+                    color: _card,
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Create Class Section (Subject Offering)',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            key: ValueKey(_selectedOfferingTeacherId),
+                            initialValue: _selectedOfferingTeacherId,
+                            style: _dropdownTextStyle,
+                            dropdownColor: _card,
+                            decoration: const InputDecoration(
+                              labelText: 'Teacher (owner of this class)',
+                            ),
+                            items: _teachers
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p.id,
+                                    child: _dropdownLabel(p.fullName),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) =>
+                                setState(() => _selectedOfferingTeacherId = v),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _subjectCodeCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Subject Code (ex: IT401)',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _subjectTitleCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Subject Title',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _sectionCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Section (ex: BSIT-4A)',
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          AdaptiveHeading(
+                            title: DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              key: ValueKey(_selectedBeaconUuid),
+                              initialValue: _selectedBeaconUuid,
                               style: _dropdownTextStyle,
                               dropdownColor: _card,
                               decoration: const InputDecoration(
@@ -566,383 +595,433 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                               onChanged: (v) =>
                                   setState(() => _selectedBeaconUuid = v),
                             ),
+                            action: OutlinedButton.icon(
+                              onPressed: _regenBeaconUuids,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('New UUIDs'),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          OutlinedButton.icon(
-                            onPressed: _regenBeaconUuids,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('New UUIDs'),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _beaconNameCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Beacon Name',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: _creatingOffering
+                                ? null
+                                : _createOffering,
+                            icon: _creatingOffering
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.class_),
+                            label: const Text('Create Class Section'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _beaconNameCtrl,
-                        decoration: const InputDecoration(labelText: 'Beacon Name'),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _creatingOffering ? null : _createOffering,
-                        icon: _creatingOffering
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.class_),
-                        label: const Text('Create Class Section'),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Enroll Student to Subject',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Admin can edit student–subject enrollment here.',
-                style: TextStyle(fontSize: 12, color: _muted),
-              ),
-              const SizedBox(height: 12),
-              if (_loadingLists) const LinearProgressIndicator(),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedStudentId,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Student'),
-                items: _students
-                    .map((s) => DropdownMenuItem(
-                          value: s.id,
-                          child: _dropdownLabel(s.fullName),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedStudentId = v),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTeacherId,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Teacher'),
-                items: _teachers
-                    .map((p) => DropdownMenuItem(
-                          value: p.id,
-                          child: _dropdownLabel(p.fullName),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedTeacherId = v;
-                    final codes = _subjectCodesForTeacher;
-                    _selectedSubjectCode = codes.isNotEmpty ? codes.first : null;
-                    final sections = _sectionsForSubject;
-                    _selectedSection = sections.isNotEmpty ? sections.first : null;
-                    _resolveSelectedOffering();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedSubjectCode,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Subject'),
-                items: _subjectCodesForTeacher
-                    .map((code) => DropdownMenuItem(
-                          value: code,
-                          child: _dropdownLabel(code),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedSubjectCode = v;
-                    final sections = _sectionsForSubject;
-                    _selectedSection = sections.isNotEmpty ? sections.first : null;
-                    _resolveSelectedOffering();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedSection,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Section'),
-                items: _sectionsForSubject
-                    .map((section) => DropdownMenuItem(
-                          value: section,
-                          child: _dropdownLabel(section),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedSection = v;
-                    _resolveSelectedOffering();
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedOfferingId,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(labelText: 'Resolved Class Offering'),
-                items: _filteredByTeacher
-                    .where((o) => _selectedSubjectCode == null || o.subjectCode == _selectedSubjectCode)
-                    .where((o) => _selectedSection == null || o.section == _selectedSection)
-                    .map((o) => DropdownMenuItem(
-                          value: o.id,
-                          child: _dropdownLabel(
-                              '${o.subjectCode} ${o.section} - ${o.teacherName}'),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedOfferingId = v),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedEnrollmentKey,
-                style: _dropdownTextStyle,
-                dropdownColor: _card,
-                decoration: const InputDecoration(
-                  labelText: 'Existing Enrollment (for editing/removal)',
-                ),
-                items: _enrollments
-                    .map((e) => DropdownMenuItem(
-                          value: '${e.studentId}|${e.offeringId}',
-                          child: _dropdownLabel(e.label),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  setState(() => _selectedEnrollmentKey = v);
-                  if (v == null) return;
-                  final parts = v.split('|');
-                  if (parts.length != 2) return;
-                  final studentId = parts[0];
-                  final offeringId = parts[1];
-                  final enrollment = _enrollments.firstWhere(
-                    (e) => e.studentId == studentId && e.offeringId == offeringId,
-                  );
-                  setState(() {
-                    _selectedStudentId = enrollment.studentId;
-                    _selectedTeacherId = enrollment.teacherId;
-                    _selectedSubjectCode = enrollment.subjectCode;
-                    _selectedSection = enrollment.section;
-                    _resolveSelectedOffering();
-                  });
-                },
-              ),
-              if (_offerings.isEmpty) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'No offerings yet. Create a teacher account above first.',
-                  style: TextStyle(color: Colors.orange),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _loadingLists ? null : _loadLists,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh lists'),
-                ),
-              ],
-              const SizedBox(height: 14),
-              ElevatedButton.icon(
-                onPressed:
-                    (_enrolling || _selectedStudentId == null || _selectedOfferingId == null)
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Enroll Student to Subject',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Admin can edit student–subject enrollment here.',
+                    style: TextStyle(fontSize: 12, color: _muted),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_loadingLists) const LinearProgressIndicator(),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedStudentId,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(labelText: 'Student'),
+                    items: _students
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s.id,
+                            child: _dropdownLabel(s.fullName),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedStudentId = v),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedTeacherId,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(labelText: 'Teacher'),
+                    items: _teachers
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p.id,
+                            child: _dropdownLabel(p.fullName),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedTeacherId = v;
+                        final codes = _subjectCodesForTeacher;
+                        _selectedSubjectCode = codes.isNotEmpty
+                            ? codes.first
+                            : null;
+                        final sections = _sectionsForSubject;
+                        _selectedSection = sections.isNotEmpty
+                            ? sections.first
+                            : null;
+                        _resolveSelectedOffering();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedSubjectCode,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(labelText: 'Subject'),
+                    items: _subjectCodesForTeacher
+                        .map(
+                          (code) => DropdownMenuItem(
+                            value: code,
+                            child: _dropdownLabel(code),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedSubjectCode = v;
+                        final sections = _sectionsForSubject;
+                        _selectedSection = sections.isNotEmpty
+                            ? sections.first
+                            : null;
+                        _resolveSelectedOffering();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedSection,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(labelText: 'Section'),
+                    items: _sectionsForSubject
+                        .map(
+                          (section) => DropdownMenuItem(
+                            value: section,
+                            child: _dropdownLabel(section),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedSection = v;
+                        _resolveSelectedOffering();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedOfferingId,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(
+                      labelText: 'Resolved Class Offering',
+                    ),
+                    items: _filteredByTeacher
+                        .where(
+                          (o) =>
+                              _selectedSubjectCode == null ||
+                              o.subjectCode == _selectedSubjectCode,
+                        )
+                        .where(
+                          (o) =>
+                              _selectedSection == null ||
+                              o.section == _selectedSection,
+                        )
+                        .map(
+                          (o) => DropdownMenuItem(
+                            value: o.id,
+                            child: _dropdownLabel(
+                              '${o.subjectCode} ${o.section} - ${o.teacherName}',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedOfferingId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    initialValue: _selectedEnrollmentKey,
+                    style: _dropdownTextStyle,
+                    dropdownColor: _card,
+                    decoration: const InputDecoration(
+                      labelText: 'Existing Enrollment (for editing/removal)',
+                    ),
+                    items: _enrollments
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: '${e.studentId}|${e.offeringId}',
+                            child: _dropdownLabel(e.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      setState(() => _selectedEnrollmentKey = v);
+                      if (v == null) return;
+                      final parts = v.split('|');
+                      if (parts.length != 2) return;
+                      final studentId = parts[0];
+                      final offeringId = parts[1];
+                      final enrollment = _enrollments.firstWhere(
+                        (e) =>
+                            e.studentId == studentId &&
+                            e.offeringId == offeringId,
+                      );
+                      setState(() {
+                        _selectedStudentId = enrollment.studentId;
+                        _selectedTeacherId = enrollment.teacherId;
+                        _selectedSubjectCode = enrollment.subjectCode;
+                        _selectedSection = enrollment.section;
+                        _resolveSelectedOffering();
+                      });
+                    },
+                  ),
+                  if (_offerings.isEmpty) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No offerings yet. Create a teacher account above first.',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _loadingLists ? null : _loadLists,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Refresh lists'),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    onPressed:
+                        (_enrolling ||
+                            _selectedStudentId == null ||
+                            _selectedOfferingId == null)
                         ? null
                         : _enrollStudent,
-                icon: _enrolling
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.how_to_reg),
-                label: const Text('Save Enrollment'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: (_enrolling || _selectedEnrollmentKey == null)
-                    ? null
-                    : _removeSelectedEnrollment,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Remove Selected Enrollment'),
-              ),
-              const SizedBox(height: 18),
-              Card(
-                color: _card,
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Admin Reports',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
+                    icon: _enrolling
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.how_to_reg),
+                    label: const Text('Save Enrollment'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: (_enrolling || _selectedEnrollmentKey == null)
+                        ? null
+                        : _removeSelectedEnrollment,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Remove Selected Enrollment'),
+                  ),
+                  const SizedBox(height: 18),
+                  Card(
+                    color: _card,
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: 240,
-                            child: DropdownButtonFormField<String?>(
-                              value: _reportTeacherId,
-                              style: _dropdownTextStyle,
-                              dropdownColor: _card,
-                              decoration: const InputDecoration(
-                                labelText: 'Teacher',
-                              ),
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: _dropdownLabel('All'),
-                                ),
-                                ..._teachers.map(
-                                  (p) => DropdownMenuItem<String?>(
-                                    value: p.id,
-                                    child: _dropdownLabel(p.fullName),
-                                  ),
-                                ),
-                              ],
-                              onChanged: (v) {
-                                setState(() {
-                                  _reportTeacherId = v;
-                                  _reportSubjectCode = null;
-                                  _reportSection = null;
-                                });
-                              },
+                          const Text(
+                            'Admin Reports',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(
-                            width: 180,
-                            child: DropdownButtonFormField<String?>(
-                              value: _reportSubjectCode,
-                              style: _dropdownTextStyle,
-                              dropdownColor: _card,
-                              decoration: const InputDecoration(
-                                labelText: 'Subject',
-                              ),
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: _dropdownLabel('All'),
-                                ),
-                                ..._reportSubjectCodeOptions.map(
-                                  (c) => DropdownMenuItem<String?>(
-                                    value: c,
-                                    child: _dropdownLabel(c),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: 240,
+                                child: DropdownButtonFormField<String?>(
+                                  isExpanded: true,
+                                  key: ValueKey(_reportTeacherId),
+                                  initialValue: _reportTeacherId,
+                                  style: _dropdownTextStyle,
+                                  dropdownColor: _card,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Teacher',
                                   ),
+                                  items: [
+                                    DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: _dropdownLabel('All'),
+                                    ),
+                                    ..._teachers.map(
+                                      (p) => DropdownMenuItem<String?>(
+                                        value: p.id,
+                                        child: _dropdownLabel(p.fullName),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (v) {
+                                    setState(() {
+                                      _reportTeacherId = v;
+                                      _reportSubjectCode = null;
+                                      _reportSection = null;
+                                    });
+                                  },
                                 ),
-                              ],
-                              onChanged: (v) {
-                                setState(() {
-                                  _reportSubjectCode = v;
-                                  _reportSection = null;
-                                });
-                              },
-                            ),
-                          ),
-                          SizedBox(
-                            width: 180,
-                            child: DropdownButtonFormField<String?>(
-                              value: _reportSection,
-                              style: _dropdownTextStyle,
-                              dropdownColor: _card,
-                              decoration: const InputDecoration(
-                                labelText: 'Section',
                               ),
-                              items: [
-                                DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: _dropdownLabel('All'),
-                                ),
-                                ..._reportSectionOptions.map(
-                                  (s) => DropdownMenuItem<String?>(
-                                    value: s,
-                                    child: _dropdownLabel(s),
+                              SizedBox(
+                                width: 180,
+                                child: DropdownButtonFormField<String?>(
+                                  isExpanded: true,
+                                  key: ValueKey(_reportSubjectCode),
+                                  initialValue: _reportSubjectCode,
+                                  style: _dropdownTextStyle,
+                                  dropdownColor: _card,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Subject',
                                   ),
+                                  items: [
+                                    DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: _dropdownLabel('All'),
+                                    ),
+                                    ..._reportSubjectCodeOptions.map(
+                                      (c) => DropdownMenuItem<String?>(
+                                        value: c,
+                                        child: _dropdownLabel(c),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (v) {
+                                    setState(() {
+                                      _reportSubjectCode = v;
+                                      _reportSection = null;
+                                    });
+                                  },
                                 ),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _reportSection = v),
-                            ),
+                              ),
+                              SizedBox(
+                                width: 180,
+                                child: DropdownButtonFormField<String?>(
+                                  isExpanded: true,
+                                  key: ValueKey(_reportSection),
+                                  initialValue: _reportSection,
+                                  style: _dropdownTextStyle,
+                                  dropdownColor: _card,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Section',
+                                  ),
+                                  items: [
+                                    DropdownMenuItem<String?>(
+                                      value: null,
+                                      child: _dropdownLabel('All'),
+                                    ),
+                                    ..._reportSectionOptions.map(
+                                      (s) => DropdownMenuItem<String?>(
+                                        value: s,
+                                        child: _dropdownLabel(s),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (v) =>
+                                      setState(() => _reportSection = v),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+                          const SizedBox(height: 10),
+                          AdaptiveHeading(
+                            title: Text(
                               _reportRange == null
                                   ? 'Date range: All records'
                                   : 'Date range: ${_reportRange!.start.toLocal().toString().split(' ').first} to ${_reportRange!.end.toLocal().toString().split(' ').first}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _muted,
+                              style: TextStyle(fontSize: 12, color: _muted),
+                            ),
+                            action: TextButton.icon(
+                              onPressed: _pickReportRange,
+                              icon: const Icon(Icons.date_range),
+                              label: const Text('Pick range'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: _loadingReport ? null : _generateReport,
+                            icon: _loadingReport
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.summarize_outlined),
+                            label: const Text('Generate Attendance Report'),
+                          ),
+                          const SizedBox(height: 12),
+                          if (_reportRows.isNotEmpty)
+                            SizedBox(
+                              height: 320,
+                              child: Card(
+                                clipBehavior: Clip.antiAlias,
+                                color: Colors.white.withValues(alpha: 0.02),
+                                elevation: 0,
+                                child: ListView.separated(
+                                  itemCount: _reportRows.length,
+                                  separatorBuilder: (_, _) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (_, i) {
+                                    final row = _reportRows[i];
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text(
+                                        '${row.subjectCode} ${row.section} • ${row.studentName}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        '${row.teacherName} • ${row.markedAt.toLocal()}',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.78,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
-                          ),
-                          TextButton.icon(
-                            onPressed: _pickReportRange,
-                            icon: const Icon(Icons.date_range),
-                            label: const Text('Pick range'),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        onPressed: _loadingReport ? null : _generateReport,
-                        icon: _loadingReport
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.summarize_outlined),
-                        label: const Text('Generate Attendance Report'),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_reportRows.isNotEmpty)
-                        SizedBox(
-                          height: 320,
-                          child: Card(
-                            clipBehavior: Clip.antiAlias,
-                            color: Colors.white.withValues(alpha: 0.02),
-                            elevation: 0,
-                            child: ListView.separated(
-                              itemCount: _reportRows.length,
-                              separatorBuilder: (_, _) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (_, i) {
-                                final row = _reportRows[i];
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(
-                                    '${row.subjectCode} ${row.section} • ${row.studentName}',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                  subtitle: Text(
-                                    '${row.teacherName} • ${row.markedAt.toLocal()}',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.78),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
                 ],
               ),
             ),
@@ -958,8 +1037,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   }
 
   List<String> get _reportSubjectCodeOptions {
-    final codes = _reportOfferingsFiltered.map((o) => o.subjectCode).toSet().toList()
-      ..sort();
+    final codes =
+        _reportOfferingsFiltered.map((o) => o.subjectCode).toSet().toList()
+          ..sort();
     return codes;
   }
 
@@ -974,9 +1054,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
 
   List<SubjectOffering> get _filteredByTeacher {
     if (_selectedTeacherId == null) return [];
-    return _offerings
-        .where((o) => o.teacherId == _selectedTeacherId)
-        .toList();
+    return _offerings.where((o) => o.teacherId == _selectedTeacherId).toList();
   }
 
   List<String> get _subjectCodesForTeacher {
@@ -986,19 +1064,21 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   }
 
   List<String> get _sectionsForSubject {
-    final sections = _filteredByTeacher
-        .where((o) => o.subjectCode == _selectedSubjectCode)
-        .map((o) => o.section)
-        .toSet()
-        .toList()
-      ..sort();
+    final sections =
+        _filteredByTeacher
+            .where((o) => o.subjectCode == _selectedSubjectCode)
+            .map((o) => o.section)
+            .toSet()
+            .toList()
+          ..sort();
     return sections;
   }
 
   void _resolveSelectedOffering() {
     final match = _filteredByTeacher.firstWhere(
       (o) =>
-          o.subjectCode == _selectedSubjectCode && o.section == _selectedSection,
+          o.subjectCode == _selectedSubjectCode &&
+          o.section == _selectedSection,
       orElse: () => const SubjectOffering(
         id: '',
         subjectId: '',

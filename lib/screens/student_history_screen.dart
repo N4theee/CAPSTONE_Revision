@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -151,14 +152,14 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
       });
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('History cleared.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('History cleared.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear history: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not clear history: $e')));
       await _load();
     }
   }
@@ -194,185 +195,168 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
             ),
           ],
         ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Failed to load history.\n$_error',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: StudentAttendanceUi.textSecondary,
+        body: ResponsivePage(
+          maxWidth: 1040,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Failed to load history.\n$_error',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: StudentAttendanceUi.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : _history.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No attendance history yet.',
+                    style: TextStyle(color: StudentAttendanceUi.textSecondary),
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final screenW = MediaQuery.sizeOf(context).width;
+                    final hPad = AppBreakpoints.horizontalPadding(context);
+                    final maxContent = AppBreakpoints.historyContentMaxWidth(
+                      screenW,
+                    );
+                    final rawInner =
+                        (constraints.maxWidth < maxContent
+                            ? constraints.maxWidth
+                            : maxContent) -
+                        hPad * 2;
+                    final inner = rawInner < 0 ? 0.0 : rawInner;
+                    final compactDate =
+                        AppBreakpoints.historyUseCompactFilters(inner) ||
+                        MediaQuery.textScalerOf(context).scale(1) > 1.3;
+
+                    final subjectField = DropdownButtonFormField<String>(
+                      key: ValueKey<String>('sub_${_subjectFilter ?? ''}'),
+                      initialValue: _subjectFilter ?? '',
+                      decoration: const InputDecoration(
+                        labelText: 'Subject',
+                        hintText: 'All Subjects',
+                      ),
+                      isExpanded: true,
+                      dropdownColor: StudentAttendanceUi.surface,
+                      style: const TextStyle(color: Colors.white),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('All Subjects'),
+                        ),
+                        ..._history
+                            .map((e) => e.subjectCode)
+                            .toSet()
+                            .map(
+                              (code) => DropdownMenuItem(
+                                value: code,
+                                child: Text(
+                                  code,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
+                      ],
+                      onChanged: (v) => setState(
+                        () => _subjectFilter = (v == null || v.isEmpty)
+                            ? null
+                            : v,
+                      ),
+                    );
+
+                    final datePanel = _StudentHistoryDatePanel(
+                      dateRange: _dateRange,
+                      compact: compactDate,
+                      onPick: _pickDateRange,
+                      onClear: () => setState(() => _dateRange = null),
+                      fmtDateOnly: _fmtDateOnly,
+                      fmtDateTime: _fmt,
+                    );
+
+                    final list = _filteredHistory;
+
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxContent),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
+                              sliver: SliverToBoxAdapter(child: subjectField),
                             ),
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
+                              sliver: SliverToBoxAdapter(child: datePanel),
+                            ),
+                            if (list.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: hPad,
+                                    ),
+                                    child: const Text(
+                                      'No records match your filters.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color:
+                                            StudentAttendanceUi.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+                                sliver: SliverList(
+                                  delegate: SliverChildBuilderDelegate(
+                                    childCount: list.length,
+                                    (context, i) {
+                                      return Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: i < list.length - 1 ? 10 : 0,
+                                        ),
+                                        child: _HistoryListCard(
+                                          item: list[i],
+                                          formatDate: _fmt,
+                                          onTap: () => _openDetail(list[i]),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                    ),
-                  )
-                : _history.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No attendance history yet.',
-                          style: TextStyle(
-                            color: StudentAttendanceUi.textSecondary,
-                          ),
-                        ),
-                      )
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final screenW = MediaQuery.sizeOf(context).width;
-                          final hPad = AppBreakpoints.horizontalPadding(context);
-                          final maxContent =
-                              AppBreakpoints.historyContentMaxWidth(screenW);
-                          final rawInner =
-                              (constraints.maxWidth < maxContent
-                                      ? constraints.maxWidth
-                                      : maxContent) -
-                                  hPad * 2;
-                          final inner = rawInner < 0 ? 0.0 : rawInner;
-                          final compactDate =
-                              AppBreakpoints.historyUseCompactFilters(inner);
-
-                          final subjectField = DropdownButtonFormField<String>(
-                            key: ValueKey<String>('sub_${_subjectFilter ?? ''}'),
-                            initialValue: _subjectFilter ?? '',
-                            decoration: const InputDecoration(
-                              labelText: 'Subject',
-                              hintText: 'All Subjects',
-                            ),
-                            isExpanded: true,
-                            dropdownColor: StudentAttendanceUi.surface,
-                            style: const TextStyle(color: Colors.white),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: '',
-                                child: Text('All Subjects'),
-                              ),
-                              ..._history
-                                  .map((e) => e.subjectCode)
-                                  .toSet()
-                                  .map(
-                                    (code) => DropdownMenuItem(
-                                      value: code,
-                                      child: Text(
-                                        code,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                            ],
-                            onChanged: (v) => setState(
-                              () => _subjectFilter =
-                                  (v == null || v.isEmpty) ? null : v,
-                            ),
-                          );
-
-                          final datePanel = _StudentHistoryDatePanel(
-                            dateRange: _dateRange,
-                            compact: compactDate,
-                            onPick: _pickDateRange,
-                            onClear: () => setState(() => _dateRange = null),
-                            fmtDateOnly: _fmtDateOnly,
-                            fmtDateTime: _fmt,
-                          );
-
-                          final list = _filteredHistory;
-
-                          return Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: maxContent),
-                              child: CustomScrollView(
-                                slivers: [
-                                  SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      hPad,
-                                      12,
-                                      hPad,
-                                      8,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: subjectField,
-                                    ),
-                                  ),
-                                  SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      hPad,
-                                      0,
-                                      hPad,
-                                      10,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: datePanel,
-                                    ),
-                                  ),
-                                  if (list.isEmpty)
-                                    SliverFillRemaining(
-                                      hasScrollBody: false,
-                                      child: Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: hPad,
-                                          ),
-                                          child: const Text(
-                                            'No records match your filters.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: StudentAttendanceUi
-                                                  .textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    SliverPadding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        hPad,
-                                        0,
-                                        hPad,
-                                        16,
-                                      ),
-                                    sliver: SliverList(
-                                      delegate: SliverChildBuilderDelegate(
-                                        childCount: list.length,
-                                        (context, i) {
-                                          return Padding(
-                                            padding: EdgeInsets.only(
-                                              bottom:
-                                                  i < list.length - 1 ? 10 : 0,
-                                            ),
-                                            child: _HistoryListCard(
-                                              item: list[i],
-                                              formatDate: _fmt,
-                                              onTap: () =>
-                                                  _openDetail(list[i]),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -398,8 +382,9 @@ class _StudentHistoryDatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final has = dateRange != null;
-    final summary =
-        has ? '${fmtDateOnly(dateRange!.start)} → ${fmtDateOnly(dateRange!.end)}' : 'All dates';
+    final summary = has
+        ? '${fmtDateOnly(dateRange!.start)} → ${fmtDateOnly(dateRange!.end)}'
+        : 'All dates';
     final sub = has
         ? '${fmtDateTime(dateRange!.start)} — ${fmtDateTime(dateRange!.end)}'
         : 'Filter by the day you marked attendance. Tap to choose a range.';
@@ -436,8 +421,7 @@ class _StudentHistoryDatePanel extends StatelessWidget {
       label: Text(compact ? 'Dates' : 'Select range'),
       style: FilledButton.styleFrom(
         foregroundColor: Colors.white,
-        backgroundColor:
-            StudentAttendanceUi.accentTeal.withValues(alpha: 0.35),
+        backgroundColor: StudentAttendanceUi.accentTeal.withValues(alpha: 0.35),
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 12 : 16,
           vertical: 10,
@@ -637,7 +621,8 @@ class _HistoryListCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     _TinyMetaRow(
                       icon: Icons.calendar_today_outlined,
-                      text: 'Class started: ${formatDate(item.sessionStartedAt)}',
+                      text:
+                          'Class started: ${formatDate(item.sessionStartedAt)}',
                     ),
                     const SizedBox(height: 4),
                     _TinyMetaRow(

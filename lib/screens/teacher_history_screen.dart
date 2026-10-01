@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -6,10 +7,7 @@ import '../ui/responsive.dart';
 import 'teacher_session_detail_screen.dart';
 
 class TeacherHistoryScreen extends StatefulWidget {
-  const TeacherHistoryScreen({
-    super.key,
-    required this.teacherId,
-  });
+  const TeacherHistoryScreen({super.key, required this.teacherId});
 
   final String teacherId;
 
@@ -153,14 +151,14 @@ class _TeacherHistoryScreenState extends State<TeacherHistoryScreen> {
       });
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('History cleared.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('History cleared.')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear history: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not clear history: $e')));
       await _load();
     }
   }
@@ -212,252 +210,229 @@ class _TeacherHistoryScreenState extends State<TeacherHistoryScreen> {
             ),
           ],
         ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(
-                    child: Scrollbar(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 420),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Failed to load history.\n$_error',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: TeacherAttendanceUi.textSecondary,
-                                ),
+        body: ResponsivePage(
+          maxWidth: 1040,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                  child: Scrollbar(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Failed to load history.\n$_error',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: TeacherAttendanceUi.textSecondary,
                               ),
-                              const SizedBox(height: 12),
-                              OutlinedButton.icon(
-                                onPressed: _load,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Retry'),
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _load,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  )
-                : _history.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No session history yet.',
-                          style: TextStyle(
-                            color: TeacherAttendanceUi.textSecondary,
-                          ),
+                  ),
+                )
+              : _history.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No session history yet.',
+                    style: TextStyle(color: TeacherAttendanceUi.textSecondary),
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final screenW = MediaQuery.sizeOf(context).width;
+                    final hPad = AppBreakpoints.horizontalPadding(context);
+                    final maxContent = AppBreakpoints.historyContentMaxWidth(
+                      screenW,
+                    );
+                    final innerW = constraints.maxWidth < maxContent
+                        ? constraints.maxWidth
+                        : maxContent;
+                    final contentInner = (innerW - hPad * 2).clamp(
+                      0.0,
+                      double.infinity,
+                    );
+                    final cols = AppBreakpoints.historySessionGridColumns(
+                      contentInner,
+                    );
+                    final list = _filteredHistory;
+                    final compactFilters =
+                        AppBreakpoints.historyUseCompactFilters(contentInner) ||
+                        MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                    final cellW = cols > 0
+                        ? (contentInner - (cols - 1) * 12) / cols
+                        : contentInner;
+
+                    final subjectField = DropdownButtonFormField<String>(
+                      key: ValueKey<String>('sub_${_subjectFilter ?? ''}'),
+                      initialValue: _subjectFilter ?? '',
+                      decoration: const InputDecoration(labelText: 'Subject'),
+                      isExpanded: true,
+                      dropdownColor: TeacherAttendanceUi.surface,
+                      style: const TextStyle(color: Colors.white),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('All'),
                         ),
-                      )
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final screenW = MediaQuery.sizeOf(context).width;
-                          final hPad = AppBreakpoints.horizontalPadding(context);
-                          final maxContent =
-                              AppBreakpoints.historyContentMaxWidth(screenW);
-                          final innerW = constraints.maxWidth < maxContent
-                              ? constraints.maxWidth
-                              : maxContent;
-                          final contentInner =
-                              (innerW - hPad * 2).clamp(0.0, double.infinity);
-                          final cols = AppBreakpoints.historySessionGridColumns(
-                            contentInner,
-                          );
-                          final tileExtent =
-                              AppBreakpoints.historySessionTileExtent(
-                            context,
-                            cols,
-                          );
-                          final list = _filteredHistory;
-                          final compactFilters =
-                              AppBreakpoints.historyUseCompactFilters(
-                            contentInner,
-                          );
-                          final cellW = cols > 0
-                              ? (contentInner - (cols - 1) * 12) / cols
-                              : contentInner;
-                          final tightCell = cellW < 300;
-
-                          final subjectField = DropdownButtonFormField<String>(
-                            key: ValueKey<String>('sub_${_subjectFilter ?? ''}'),
-                            initialValue: _subjectFilter ?? '',
-                            decoration: const InputDecoration(
-                              labelText: 'Subject',
-                            ),
-                            isExpanded: true,
-                            dropdownColor: TeacherAttendanceUi.surface,
-                            style: const TextStyle(color: Colors.white),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: '',
-                                child: Text('All'),
-                              ),
-                              ..._history
-                                  .map((e) => e.subjectCode)
-                                  .toSet()
-                                  .map(
-                                    (code) => DropdownMenuItem(
-                                      value: code,
-                                      child: Text(
-                                        code,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                            ],
-                            onChanged: (v) => setState(
-                              () => _subjectFilter =
-                                  (v == null || v.isEmpty) ? null : v,
-                            ),
-                          );
-                          final sectionField = DropdownButtonFormField<String>(
-                            key: ValueKey<String>('sec_${_sectionFilter ?? ''}'),
-                            initialValue: _sectionFilter ?? '',
-                            decoration: const InputDecoration(
-                              labelText: 'Section',
-                            ),
-                            isExpanded: true,
-                            dropdownColor: TeacherAttendanceUi.surface,
-                            style: const TextStyle(color: Colors.white),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: '',
-                                child: Text('All'),
-                              ),
-                              ..._history
-                                  .map((e) => e.section)
-                                  .toSet()
-                                  .map(
-                                    (section) => DropdownMenuItem(
-                                      value: section,
-                                      child: Text(
-                                        section,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                            ],
-                            onChanged: (v) => setState(
-                              () => _sectionFilter =
-                                  (v == null || v.isEmpty) ? null : v,
-                            ),
-                          );
-
-                          final filters = (!compactFilters) && cols >= 2
-                              ? Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: subjectField),
-                                    SizedBox(width: innerW >= 720 ? 16 : 12),
-                                    Expanded(child: sectionField),
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    subjectField,
-                                    const SizedBox(height: 12),
-                                    sectionField,
-                                  ],
-                                );
-
-                          final datePanel = _HistoryDateFilterPanel(
-                            dateRange: _dateRange,
-                            compact: compactFilters,
-                            onPickRange: _pickDateRange,
-                            onClearRange: () => setState(() => _dateRange = null),
-                            formatDateOnly: _fmtDateOnly,
-                            formatDateTime: _fmt,
-                          );
-
-                          return Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: maxContent),
-                              child: CustomScrollView(
-                                slivers: [
-                                  SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      hPad,
-                                      12,
-                                      hPad,
-                                      8,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: filters,
-                                    ),
-                                  ),
-                                  SliverPadding(
-                                    padding: EdgeInsets.fromLTRB(
-                                      hPad,
-                                      0,
-                                      hPad,
-                                      10,
-                                    ),
-                                    sliver: SliverToBoxAdapter(
-                                      child: datePanel,
-                                    ),
-                                  ),
-                                  if (list.isEmpty)
-                                    SliverFillRemaining(
-                                      hasScrollBody: false,
-                                      child: Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: hPad,
-                                          ),
-                                          child: const Text(
-                                            'No sessions match your filters.',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: TeacherAttendanceUi
-                                                  .textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    SliverPadding(
-                                      padding: EdgeInsets.fromLTRB(
-                                        hPad,
-                                        0,
-                                        hPad,
-                                        16,
-                                      ),
-                                      sliver: SliverGrid(
-                                        gridDelegate:
-                                            SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: cols,
-                                          mainAxisSpacing: 12,
-                                          crossAxisSpacing: 12,
-                                          mainAxisExtent: tileExtent,
-                                        ),
-                                        delegate: SliverChildBuilderDelegate(
-                                          childCount: list.length,
-                                          (context, i) {
-                                            return _SessionHistoryCard(
-                                              item: list[i],
-                                              formatDate: _fmt,
-                                              onTap: () => _openSessionDetail(
-                                                list[i],
-                                              ),
-                                              tightLayout: tightCell,
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                        ..._history
+                            .map((e) => e.subjectCode)
+                            .toSet()
+                            .map(
+                              (code) => DropdownMenuItem(
+                                value: code,
+                                child: Text(
+                                  code,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ),
-                          );
-                        },
+                      ],
+                      onChanged: (v) => setState(
+                        () => _subjectFilter = (v == null || v.isEmpty)
+                            ? null
+                            : v,
                       ),
+                    );
+                    final sectionField = DropdownButtonFormField<String>(
+                      key: ValueKey<String>('sec_${_sectionFilter ?? ''}'),
+                      initialValue: _sectionFilter ?? '',
+                      decoration: const InputDecoration(labelText: 'Section'),
+                      isExpanded: true,
+                      dropdownColor: TeacherAttendanceUi.surface,
+                      style: const TextStyle(color: Colors.white),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('All'),
+                        ),
+                        ..._history
+                            .map((e) => e.section)
+                            .toSet()
+                            .map(
+                              (section) => DropdownMenuItem(
+                                value: section,
+                                child: Text(
+                                  section,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                      ],
+                      onChanged: (v) => setState(
+                        () => _sectionFilter = (v == null || v.isEmpty)
+                            ? null
+                            : v,
+                      ),
+                    );
+
+                    final filters = (!compactFilters) && cols >= 2
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: subjectField),
+                              SizedBox(width: innerW >= 720 ? 16 : 12),
+                              Expanded(child: sectionField),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              subjectField,
+                              const SizedBox(height: 12),
+                              sectionField,
+                            ],
+                          );
+
+                    final datePanel = _HistoryDateFilterPanel(
+                      dateRange: _dateRange,
+                      compact: compactFilters,
+                      onPickRange: _pickDateRange,
+                      onClearRange: () => setState(() => _dateRange = null),
+                      formatDateOnly: _fmtDateOnly,
+                      formatDateTime: _fmt,
+                    );
+
+                    return Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: maxContent),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
+                              sliver: SliverToBoxAdapter(child: filters),
+                            ),
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 10),
+                              sliver: SliverToBoxAdapter(child: datePanel),
+                            ),
+                            if (list.isEmpty)
+                              SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: hPad,
+                                    ),
+                                    child: const Text(
+                                      'No sessions match your filters.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color:
+                                            TeacherAttendanceUi.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              SliverPadding(
+                                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+                                sliver: SliverToBoxAdapter(
+                                  child: Wrap(
+                                    spacing: 12,
+                                    runSpacing: 12,
+                                    children: [
+                                      for (final item in list)
+                                        SizedBox(
+                                          width:
+                                              MediaQuery.textScalerOf(
+                                                    context,
+                                                  ).scale(1) >
+                                                  1.3
+                                              ? contentInner
+                                              : cellW,
+                                          child: _SessionHistoryCard(
+                                            item: item,
+                                            formatDate: _fmt,
+                                            onTap: () =>
+                                                _openSessionDetail(item),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }
@@ -536,13 +511,11 @@ class _HistoryDateFilterPanel extends StatelessWidget {
           Text(
             sub,
             style: TextStyle(
-              color: TeacherAttendanceUi.textSecondary.withValues(
-                alpha: 0.95,
-              ),
+              color: TeacherAttendanceUi.textSecondary.withValues(alpha: 0.95),
               fontSize: 11,
               height: 1.35,
             ),
-            maxLines: compact ? 3 : 2,
+            maxLines: null,
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -555,8 +528,9 @@ class _HistoryDateFilterPanel extends StatelessWidget {
       label: Text(compact ? 'Dates' : 'Select range'),
       style: FilledButton.styleFrom(
         foregroundColor: Colors.white,
-        backgroundColor:
-            TeacherAttendanceUi.accentPurple.withValues(alpha: 0.35),
+        backgroundColor: TeacherAttendanceUi.accentPurple.withValues(
+          alpha: 0.35,
+        ),
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 12 : 16,
           vertical: 10,
@@ -633,11 +607,7 @@ class _HistoryDateFilterPanel extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: pickButton),
-                      ],
-                    ),
+                    Row(children: [Expanded(child: pickButton)]),
                   ],
                 )
               : Row(
@@ -667,132 +637,26 @@ class _SessionHistoryCard extends StatelessWidget {
     required this.item,
     required this.formatDate,
     required this.onTap,
-    this.tightLayout = false,
   });
-
   final TeacherSessionHistoryItem item;
   final String Function(DateTime) formatDate;
   final VoidCallback onTap;
-  final bool tightLayout;
-
   @override
-  Widget build(BuildContext context) {
-    final ended = item.endedAt == null
-        ? 'In progress'
-        : formatDate(item.endedAt!);
-    final titleLines = tightLayout ? 1 : 2;
-    final timeStyle = TextStyle(
-      color: TeacherAttendanceUi.textSecondary,
-      fontSize: tightLayout ? 10 : 11,
-    );
-
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: TeacherAttendanceUi.accentPurple.withValues(alpha: 0.55),
-        ),
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: DetailCard(
+      title: '${item.subjectCode} — ${item.subjectTitle}',
+      badge: StatusBadge(
+        label: item.isActive ? 'Active' : 'Ended',
+        color: TeacherAttendanceUi.accentPurple,
       ),
-      child: Text(
-        item.isActive ? 'Active' : 'Done',
-        style: const TextStyle(
-          color: TeacherAttendanceUi.accentPurple,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-
-    return Material(
-      color: TeacherAttendanceUi.surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            tightLayout ? 8 : 10,
-            tightLayout ? 8 : 10,
-            tightLayout ? 8 : 10,
-            tightLayout ? 6 : 8,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: tightLayout ? 40 : 46,
-                height: tightLayout ? 40 : 46,
-                decoration: BoxDecoration(
-                  color: TeacherAttendanceUi.accentPurple
-                      .withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: TeacherAttendanceUi.accentPurple
-                        .withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Icon(
-                  Icons.event_available_rounded,
-                  color: TeacherAttendanceUi.accentPurple,
-                  size: tightLayout ? 22 : 24,
-                ),
-              ),
-              SizedBox(width: tightLayout ? 8 : 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${item.subjectCode} - ${item.subjectTitle}',
-                      maxLines: titleLines,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: tightLayout ? 12.5 : 13.5,
-                        height: 1.2,
-                      ),
-                    ),
-                    SizedBox(height: tightLayout ? 2 : 3),
-                    Text(
-                      'Section ${item.section}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: TeacherAttendanceUi.textSecondary,
-                        fontSize: tightLayout ? 10.5 : 11.5,
-                      ),
-                    ),
-                    SizedBox(height: tightLayout ? 3 : 4),
-                    Text(
-                      'Started: ${formatDate(item.startedAt)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: timeStyle,
-                    ),
-                    Text(
-                      'Ended: $ended',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: timeStyle,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: chip,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+      details: [
+        'Section ${item.section}',
+        'Started: ${formatDate(item.startedAt)}',
+        'Ended: ${item.endedAt == null ? 'In progress' : formatDate(item.endedAt!)}',
+        'Open session details',
+      ],
+    ),
+  );
 }

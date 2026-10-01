@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
-import '../ui/responsive.dart';
+import '../ui/adaptive_layout.dart';
 import '../ui/student_attendance_ui.dart';
 
 class ExamHistoryScreen extends StatefulWidget {
@@ -68,19 +67,19 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
       if (!mounted) return;
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Exam history cleared.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Exam history cleared.')));
     } on ExamServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear history: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not clear history: $e')));
     }
   }
 
@@ -127,112 +126,85 @@ class _ExamHistoryScreenState extends State<ExamHistoryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final hPad = AppBreakpoints.horizontalPadding(context);
-
-    return Theme(
-      data: ExamUi.studentThemeOverlay(Theme.of(context)),
-      child: Scaffold(
+  Widget build(BuildContext context) => Theme(
+    data: ExamUi.studentThemeOverlay(Theme.of(context)),
+    child: Builder(
+      builder: (context) => Scaffold(
         appBar: AppBar(
-          title: const Text('Exam History'),
+          title: const Text('Exam history'),
           actions: [
             IconButton(
               tooltip: 'Clear exam history',
               onPressed: _history.isEmpty || _loading ? null : _clearHistory,
-              icon: const Icon(Icons.delete_outline_rounded),
+              icon: const Icon(Icons.delete_outline),
             ),
           ],
         ),
-        body: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
-            children: [
-              Text(
-                '${widget.offering.subjectCode} - ${widget.offering.subjectTitle}',
-                style: ExamUi.titleMedium(context),
-              ),
-              Text(
-                'Section ${widget.offering.section}',
-                style: ExamUi.bodySecondary(context),
-              ),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                Text(_error!, style: const TextStyle(color: Colors.redAccent))
-              else if (_history.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'No exam attempts yet for this subject.',
-                      style: ExamUi.bodySecondary(context),
+        body: ResponsivePage(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  '${widget.offering.subjectCode} — ${widget.offering.subjectTitle}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text('Section ${widget.offering.section}'),
+                const SizedBox(height: 20),
+                if (_loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
                     ),
-                  ),
-                )
-              else
-                ..._history.map((item) {
-                  final statusKey = ExamService.studentExamStatusKey(
-                    attemptStatus: item.status,
-                    sessionStatus: item.sessionStatus,
-                  );
-                  final finished = item.finishedAt;
-                  final scoreLine = item.percentageScore != null
-                      ? 'Score: ${item.percentageScore!.toStringAsFixed(1)}%'
-                      : null;
-                  final timeLine = item.completionSeconds != null &&
-                          item.completionSeconds! > 0
-                      ? 'Time: ${ExamService.formatCompletionTime(item.completionSeconds)}'
-                      : null;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: ListTile(
-                      title: Text(
-                        item.examTitle,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      subtitle: Text(
-                        '${item.examCode}\n'
-                        'Started ${ExamUi.formatExamDateTime(item.startedAt)}'
-                        '${finished != null ? '\nSubmitted ${ExamUi.formatExamDateTime(finished)}' : ''}'
-                        '${scoreLine != null ? '\n$scoreLine' : ''}'
-                        '${timeLine != null ? ' • $timeLine' : ''}'
-                        '\nViolations: ${item.violationCount}',
-                        style: ExamUi.bodySecondary(context),
-                      ),
-                      isThreeLine: true,
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: _statusColor(statusKey)),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          item.displayStatus,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: _statusColor(statusKey),
+                  )
+                else if (_error != null)
+                  LoadError(
+                    message: 'Could not load your exam history.',
+                    onRetry: _load,
+                  )
+                else if (_history.isEmpty)
+                  const DetailCard(
+                    title: 'No exam attempts yet',
+                    details: ['You haven’t taken any exams for this subject.'],
+                  )
+                else
+                  for (final item in _history)
+                    DetailCard(
+                      title: item.examTitle,
+                      badge: StatusBadge(
+                        label: item.displayStatus,
+                        color: _statusColor(
+                          ExamService.studentExamStatusKey(
+                            attemptStatus: item.status,
+                            sessionStatus: item.sessionStatus,
                           ),
                         ),
                       ),
+                      details: [
+                        'Exam code: ${item.examCode}',
+                        'Started: ${ExamUi.formatExamDateTime(item.startedAt)}',
+                        if (item.finishedAt != null)
+                          '${item.status == 'completed' ? 'Submitted' : 'Ended'}: ${ExamUi.formatExamDateTime(item.finishedAt)}',
+                        if (item.status == 'completed' &&
+                            item.percentageScore != null)
+                          'Score: ${item.percentageScore!.toStringAsFixed(1)}%'
+                        else
+                          'Not submitted',
+                        if (item.status == 'completed' &&
+                            item.completionSeconds != null)
+                          'Completion time: ${ExamService.formatCompletionTime(item.completionSeconds)}',
+                        'Proximity violations: ${item.violationCount}',
+                      ],
                     ),
-                  );
-                }),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

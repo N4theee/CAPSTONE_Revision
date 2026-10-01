@@ -1,9 +1,9 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config.dart';
 import '../services/ble_service.dart';
-import '../services/exam_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
@@ -108,10 +108,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
       }
       if (!mounted) return;
       setState(() => _loadState = _JoinLoadState.idle);
-      _navigateToMonitor(
-        session: liveSession ?? session,
-        attempt: attempt,
-      );
+      _navigateToMonitor(session: liveSession ?? session, attempt: attempt);
       throw _ResumeExistingAttempt();
     }
   }
@@ -216,8 +213,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
       setState(() {
         _validatedSession = session;
         _loadState = _JoinLoadState.checkingProximity;
-        _statusLine =
-            'Exam code accepted. Checking teacher proximity…';
+        _statusLine = 'Exam code accepted. Checking teacher proximity…';
       });
 
       final inRange = await checkTeacherProximityWithTimeout(session);
@@ -354,10 +350,7 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
             _debugRow('UUID matched', d.uuidMatched ? 'true' : 'false'),
             _debugRow('Name matched', d.nameMatched ? 'true' : 'false'),
             _debugRow('Final inRange', d.finalInRange ? 'true' : 'false'),
-            _debugRow(
-              'Last seen',
-              d.lastSeenAt?.toIso8601String() ?? '—',
-            ),
+            _debugRow('Last seen', d.lastSeenAt?.toIso8601String() ?? '—'),
             _debugRow('Scanning', d.scanning ? 'yes' : 'no'),
             _debugRow('Elapsed', '${d.elapsed.inMilliseconds} ms'),
           ],
@@ -400,96 +393,109 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
 
     return Theme(
       data: ExamUi.studentThemeOverlay(Theme.of(context)),
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Join Exam')),
-        body: ListView(
-          padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
-          children: [
-            Text(
-              widget.offering.label,
-              style: ExamUi.titleMedium(context),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Exam must be active for this class',
-              style: ExamUi.bodySecondary(context),
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _codeCtrl,
-              enabled: !_busy,
-              style: StudentAttendanceUi.fieldTextStyle(),
-              cursorColor: StudentAttendanceUi.mint,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Exam code',
-                hintText: 'EXM-7K92Q',
-                prefixIcon: Icon(Icons.pin_outlined),
+      child: Builder(
+        builder: (context) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Join Exam')),
+            body: ResponsivePage(
+              maxWidth: 1040,
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 32),
+                children: [
+                  Text(
+                    widget.offering.label,
+                    style: ExamUi.titleMedium(context),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Exam must be active for this class',
+                    style: ExamUi.bodySecondary(context),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _codeCtrl,
+                    enabled: !_busy,
+                    style: StudentAttendanceUi.fieldTextStyle(),
+                    cursorColor: StudentAttendanceUi.mint,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[A-Za-z0-9\-]'),
+                      ),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Exam code',
+                      hintText: 'EXM-7K92Q',
+                      prefixIcon: Icon(Icons.pin_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_busy) ...[
+                    const Center(child: CircularProgressIndicator()),
+                    const SizedBox(height: 12),
+                    if (_statusLine != null)
+                      Text(
+                        _statusLine!,
+                        textAlign: TextAlign.center,
+                        style: ExamUi.bodySecondary(context),
+                      ),
+                  ] else if (showRetry) ...[
+                    Icon(
+                      Icons.bluetooth_searching,
+                      size: 48,
+                      color: StudentAttendanceUi.textOnField.withValues(
+                        alpha: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _statusLine ?? '',
+                      textAlign: TextAlign.center,
+                      style: ExamUi.bodySecondary(
+                        context,
+                      )?.copyWith(height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _retryProximityCheck,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('Retry Proximity Check'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _loadState = _JoinLoadState.idle;
+                          _statusLine = null;
+                          _validatedSession = null;
+                        });
+                      },
+                      child: const Text('Change exam code'),
+                    ),
+                  ] else
+                    FilledButton(
+                      onPressed: _joinExam,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Text('Join exam'),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  _debugPanel(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your teacher must open the active exam on their phone (beacon on). '
+                    'After the code is accepted, we scan for up to '
+                    '${AppConfig.examJoinScanTimeoutSeconds} seconds. Keep Bluetooth and Location on.',
+                    style: ExamUi.bodySecondary(context)?.copyWith(height: 1.4),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            if (_busy) ...[
-              const Center(child: CircularProgressIndicator()),
-              const SizedBox(height: 12),
-              if (_statusLine != null)
-                Text(
-                  _statusLine!,
-                  textAlign: TextAlign.center,
-                  style: ExamUi.bodySecondary(context),
-                ),
-            ] else if (showRetry) ...[
-              Icon(
-                Icons.bluetooth_searching,
-                size: 48,
-                color: StudentAttendanceUi.textOnField.withValues(alpha: 0.7),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _statusLine ?? '',
-                textAlign: TextAlign.center,
-                style: ExamUi.bodySecondary(context)?.copyWith(height: 1.4),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _retryProximityCheck,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  child: Text('Retry Proximity Check'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _loadState = _JoinLoadState.idle;
-                    _statusLine = null;
-                    _validatedSession = null;
-                  });
-                },
-                child: const Text('Change exam code'),
-              ),
-            ] else
-              FilledButton(
-                onPressed: _joinExam,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  child: Text('Join exam'),
-                ),
-              ),
-            const SizedBox(height: 12),
-            _debugPanel(),
-            const SizedBox(height: 8),
-            Text(
-              'Your teacher must open the active exam on their phone (beacon on). '
-              'After the code is accepted, we scan for up to '
-              '${AppConfig.examJoinScanTimeoutSeconds} seconds. Keep Bluetooth and Location on.',
-              style: ExamUi.bodySecondary(context)?.copyWith(height: 1.4),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

@@ -17,11 +17,14 @@ class App extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Attendximity',
+      title: 'Proxamity',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFF0B1220),
         colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF5C6BC0)),
+          brightness: Brightness.dark,
+          seedColor: const Color(0xFF5C6BC0),
+        ),
         useMaterial3: true,
       ),
       home: const SessionBootstrapScreen(),

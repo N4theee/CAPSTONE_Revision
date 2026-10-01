@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
-import '../ui/responsive.dart';
+import '../ui/adaptive_layout.dart';
 import '../ui/teacher_attendance_ui.dart';
 
 class ExamRankingsScreen extends StatefulWidget {
@@ -24,11 +24,24 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
   bool _loading = true;
   String? _error;
   List<ExamRankingRow> _rows = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _deleteExamSession() async {
@@ -36,12 +49,19 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TeacherAttendanceUi.surface,
-        title: Text('Delete exam session?', style: ExamUi.titleMedium(ctx)),
+        title: const Text(
+          'Delete exam session?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(
-          'Are you sure you want to delete this exam? This will remove the exam '
+          'Delete ${widget.session.examTitle} (${widget.session.examCode})? This will remove the exam '
           'session, questions, choices, attempts, answers, proximity logs, alerts, '
           'and rankings.',
-          style: ExamUi.body(ctx),
+          style: TextStyle(color: Colors.white70, fontSize: 14),
         ),
         actions: [
           TextButton(
@@ -68,22 +88,22 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
     try {
       await _exam.deleteExamSessionCompletely(widget.session.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Exam session deleted.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Exam session deleted.')));
       Navigator.pop(context, true);
     } on ExamServiceException catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete exam: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete exam: $e')));
     }
   }
 
@@ -92,11 +112,18 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TeacherAttendanceUi.surface,
-        title: Text('Clear all class rankings?', style: ExamUi.titleMedium(ctx)),
+        title: const Text(
+          'Clear all class rankings?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(
           'Delete rankings for every exam session in ${widget.offering.subjectCode} '
           'Section ${widget.offering.section}? This cannot be undone.',
-          style: ExamUi.body(ctx),
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
         actions: [
           TextButton(
@@ -117,18 +144,20 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All exam rankings for this class cleared.')),
+        const SnackBar(
+          content: Text('All exam rankings for this class cleared.'),
+        ),
       );
     } on ExamServiceException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not clear rankings: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not clear rankings: $e')));
     }
   }
 
@@ -154,130 +183,139 @@ class _ExamRankingsScreenState extends State<ExamRankingsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final hPad = AppBreakpoints.horizontalPadding(context);
-
-    return Theme(
-      data: ExamUi.teacherThemeOverlay(Theme.of(context)),
-      child: Scaffold(
+  Widget build(BuildContext context) => Theme(
+    data: ExamUi.teacherThemeOverlay(Theme.of(context)),
+    child: Builder(
+      builder: (context) => Scaffold(
         appBar: AppBar(
-          title: const Text('Exam Rankings'),
+          title: const Text('Exam rankings'),
           actions: [
             IconButton(
-              tooltip: 'Delete exam session',
-              onPressed: _loading ? null : _deleteExamSession,
-              icon: const Icon(Icons.delete_forever_outlined),
+              tooltip: 'Refresh rankings',
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh),
             ),
             PopupMenuButton<String>(
-              tooltip: 'More',
-              onSelected: (v) {
-                if (v == 'clear_all') _clearAllRankingsForClass();
+              tooltip: 'Ranking actions',
+              onSelected: (value) {
+                if (value == 'clear_all') _clearAllRankingsForClass();
               },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(
+              itemBuilder: (_) => [
+                PopupMenuItem(
                   value: 'clear_all',
-                  child: Text('Clear all rankings for this class'),
+                  enabled: !_loading,
+                  child: const Text('Clear all class rankings'),
                 ),
               ],
             ),
           ],
         ),
-        body: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 32),
-            children: [
-              Text(
-                widget.session.examTitle,
-                style: ExamUi.titleMedium(context),
-              ),
-              Text(
-                '${widget.session.examCode} • ${widget.offering.subjectCode}',
-                style: ExamUi.bodySecondary(context),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
+        body: ResponsivePage(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  widget.session.examTitle,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${widget.session.examCode} · ${widget.offering.subjectCode} · Section ${widget.offering.section}',
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    labelText: 'Search student name',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: _searchController.clear,
+                            icon: const Icon(Icons.close),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (_loading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else if (_error != null)
+                  LoadError(message: 'Could not load rankings.', onRetry: _load)
+                else if (_rows.isEmpty)
+                  const DetailCard(
+                    title: 'No results yet',
+                    details: [
+                      'Rankings appear after students submit their exams.',
+                    ],
+                  )
+                else
+                  Builder(
+                    builder: (context) {
+                      final filtered = _rows
+                          .where(
+                            (r) => r.studentName.toLowerCase().contains(
+                              _searchQuery.trim().toLowerCase(),
+                            ),
+                          )
+                          .toList();
+                      if (filtered.isEmpty) {
+                        return const Text('No students match your search.');
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final row in filtered)
+                            DetailCard(
+                              title:
+                                  '${row.rankNumber ?? (_rows.indexOf(row) + 1)}. ${row.studentName}',
+                              badge: StatusBadge(
+                                label: '${row.examScore.toStringAsFixed(1)}%',
+                                color: TeacherAttendanceUi.accentPurple,
+                              ),
+                              details: [
+                                'Completion time: ${ExamService.formatCompletionTime(row.completionSeconds)}',
+                                'Proximity violations: ${row.violationCount}',
+                                if (row.startedAt != null)
+                                  'Started: ${ExamUi.formatExamDateTime(row.startedAt)}',
+                                if (row.finishedAt != null)
+                                  'Submitted: ${ExamUi.formatExamDateTime(row.finishedAt)}',
+                                if (row.remarks?.isNotEmpty == true)
+                                  row.remarks!,
+                              ],
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                const SizedBox(height: 32),
+                const Divider(),
+                const SizedBox(height: 12),
+                const Text(
+                  'Permanent deletion removes this exam and its related records.',
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _deleteExamSession,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: TeacherAttendanceUi.anomalyRed,
-                    side: const BorderSide(color: TeacherAttendanceUi.anomalyRed),
                   ),
-                  onPressed: _loading ? null : _deleteExamSession,
-                  icon: const Icon(Icons.delete_forever_outlined, size: 18),
-                  label: const Text('Delete Exam Session'),
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text('Delete exam session'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_error != null)
-                Text(_error!, style: const TextStyle(color: Colors.redAccent))
-              else if (_rows.isEmpty)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'No rankings yet. Rankings are recorded when exam attempts are scored.',
-                      style: ExamUi.bodySecondary(context),
-                    ),
-                  ),
-                )
-              else
-                ..._rows.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final r = entry.value;
-                  final rank = r.rankNumber ?? (i + 1);
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            TeacherAttendanceUi.accentPurple.withValues(
-                          alpha: 0.25,
-                        ),
-                        child: Text(
-                          '$rank',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      title: Text(
-                        r.studentName,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      subtitle: Text(
-                        'Score ${r.examScore.toStringAsFixed(1)}% • '
-                        'Time ${ExamService.formatCompletionTime(r.completionSeconds)} • '
-                        'Violations ${r.violationCount}'
-                        '${r.remarks != null && r.remarks!.isNotEmpty ? '\n${r.remarks}' : ''}',
-                      ),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${r.examScore.toStringAsFixed(1)}%',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                              color: TeacherAttendanceUi.accentPurple,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

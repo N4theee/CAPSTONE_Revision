@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
@@ -117,13 +118,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: Text(
+          title: const Text(
             'Unanswered questions',
-            style: ExamUi.titleMedium(ctx),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
             'You have $unanswered unanswered question(s). Submit anyway?',
-            style: ExamUi.body(ctx),
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
@@ -143,10 +144,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: Text('Submit exam?', style: ExamUi.titleMedium(ctx)),
-          content: Text(
+          title: const Text(
+            'Submit exam?',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
             'You cannot change answers after submitting.',
-            style: ExamUi.body(ctx),
+            style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
@@ -180,13 +184,16 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           backgroundColor: StudentAttendanceUi.surfaceElevated,
-          title: Text('Exam submitted', style: ExamUi.titleMedium(ctx)),
+          title: const Text(
+            'Exam submitted',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
           content: Text(
             'Score: ${result.rawScore}/${result.totalPoints} '
             '(${result.percentageScore.toStringAsFixed(1)}%)\n'
             'Time: ${ExamService.formatCompletionTime(result.completionSeconds)}\n'
             'Submitted: ${ExamUi.formatExamDateTime(result.submittedAt)}',
-            style: ExamUi.body(ctx),
+            style: const TextStyle(color: Colors.white70),
           ),
           actions: [
             FilledButton(
@@ -212,145 +219,161 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   @override
   Widget build(BuildContext context) {
     final hPad = AppBreakpoints.horizontalPadding(context);
-    final textTheme = Theme.of(context).textTheme;
 
     return Theme(
       data: ExamUi.studentThemeOverlay(Theme.of(context)),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Take exam'),
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null && _questions.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(hPad),
-                      child: Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.redAccent),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              widget.session.examTitle,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              '${widget.session.examCode} • '
-                              '${_questions.length} question(s)',
-                              style: ExamUi.bodySecondary(context),
-                            ),
-                            if (widget.session.durationMinutes > 0)
-                              Text(
-                                'Suggested duration: ${widget.session.durationMinutes} min',
-                                style: ExamUi.bodySecondary(context),
-                              ),
-                          ],
+      child: Builder(
+        builder: (context) {
+          final textTheme = Theme.of(context).textTheme;
+          return Scaffold(
+            appBar: AppBar(title: const Text('Take exam')),
+            body: ResponsivePage(
+              maxWidth: 800,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null && _questions.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(hPad),
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.redAccent),
                         ),
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 100),
-                          itemCount: _questions.length,
-                          itemBuilder: (context, index) {
-                            final q = _questions[index];
-                            final selected = _selectedByQuestion[q.id];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Q${index + 1} (${q.points} pt${q.points == 1 ? '' : 's'})',
-                                      style: textTheme.labelLarge?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: StudentAttendanceUi.mint,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      q.questionText,
-                                      style: textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ...q.choices.map((c) {
-                                      final picked = selected == c.id;
-                                      return ExamUi.mcqChoiceTile(
-                                        context: context,
-                                        letter: ExamUi.choiceLetterForOrder(
-                                          c.choiceOrder,
+                    )
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 16),
+                            itemCount: _questions.length + 1,
+                            itemBuilder: (context, itemIndex) {
+                              if (itemIndex == 0) {
+                                return Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    hPad,
+                                    12,
+                                    hPad,
+                                    8,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        widget.session.examTitle,
+                                        style: textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                        choiceText: c.choiceText,
-                                        selected: picked,
-                                        enabled: !_submitting,
-                                        onTap: () {
-                                          setState(() {
-                                            _selectedByQuestion[q.id] = c.id;
-                                          });
-                                        },
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      SafeArea(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_unansweredCount > 0)
-                                Text(
-                                  '$_unansweredCount unanswered',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.orangeAccent,
-                                    fontSize: 12,
+                                      ),
+                                      Text(
+                                        '${widget.session.examCode} • '
+                                        '${_questions.length} question(s)',
+                                        style: ExamUi.bodySecondary(context),
+                                      ),
+                                      if (widget.session.durationMinutes > 0)
+                                        Text(
+                                          'Suggested duration: ${widget.session.durationMinutes} min',
+                                          style: ExamUi.bodySecondary(context),
+                                        ),
+                                    ],
                                   ),
-                                ),
-                              FilledButton(
-                                onPressed:
-                                    _submitting ? null : _confirmSubmit,
+                                );
+                              }
+                              final index = itemIndex - 1;
+                              final q = _questions[index];
+                              final selected = _selectedByQuestion[q.id];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: _submitting
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
+                                  padding: const EdgeInsets.all(14),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Q${index + 1} (${q.points} pt${q.points == 1 ? '' : 's'})',
+                                        style: textTheme.labelLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: StudentAttendanceUi.mint,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        q.questionText,
+                                        style: textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      ...q.choices.map((c) {
+                                        final picked = selected == c.id;
+                                        return ExamUi.mcqChoiceTile(
+                                          context: context,
+                                          letter: ExamUi.choiceLetterForOrder(
+                                            c.choiceOrder,
                                           ),
-                                        )
-                                      : const Text('Submit exam'),
+                                          choiceText: c.choiceText,
+                                          selected: picked,
+                                          enabled: !_submitting,
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedByQuestion[q.id] = c.id;
+                                            });
+                                          },
+                                        );
+                                      }),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                        SafeArea(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_unansweredCount > 0)
+                                  Text(
+                                    '$_unansweredCount unanswered',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.orangeAccent,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                FilledButton(
+                                  onPressed: _submitting
+                                      ? null
+                                      : _confirmSubmit,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: _submitting
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text('Submit exam'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          );
+        },
       ),
     );
   }

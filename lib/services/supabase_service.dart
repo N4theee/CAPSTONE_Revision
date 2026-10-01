@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -399,6 +399,19 @@ class SupabaseService {
         .toList();
   }
 
+  Future<String?> getStudentNumber(String studentId) async {
+    try {
+      final res = await _db
+          .from('students')
+          .select('student_number')
+          .eq('id', studentId)
+          .maybeSingle();
+      return res?['student_number'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<TeacherBasic>> getAllTeachers() async {
     final rows = await _db.from('teachers').select('id, full_name').order(
           'full_name',
@@ -585,6 +598,22 @@ class SupabaseService {
     return rows
         .map((e) => _offeringFromMap(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getEnrolledStudents(String offeringId) async {
+    final rows = await _db
+        .from('student_subject_enrollments')
+        .select('students(id, full_name, student_number)')
+        .eq('subject_offering_id', offeringId);
+    
+    return rows.map((e) {
+      final s = (e['students'] as Map<String, dynamic>?) ?? {};
+      return {
+        'id': s['id'] ?? '',
+        'full_name': s['full_name'] ?? 'Unknown',
+        'student_number': s['student_number'] ?? 'N/A',
+      };
+    }).toList();
   }
 
   Future<List<SubjectOffering>> getTeacherOfferings(String teacherId) async {

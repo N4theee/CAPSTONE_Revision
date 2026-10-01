@@ -26,110 +26,62 @@ class CourseDashboardCard extends StatelessWidget {
   final Color chevron;
 
   @override
-  Widget build(BuildContext context) {
-    final scaler = MediaQuery.textScalerOf(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final titleSize =
-            (constraints.maxWidth / 11).clamp(10.5, 13.0).toDouble();
-        final subSize =
-            (constraints.maxWidth / 13).clamp(10.0, 12.0).toDouble();
-        final padH = (constraints.maxWidth * 0.08).clamp(10.0, 14.0);
-        final padV = (constraints.maxHeight * 0.06).clamp(10.0, 16.0);
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            child: Ink(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border:
-                    Border.all(color: cardTopBorder.withValues(alpha: 0.35)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: '$title, $sectionLine, $footerLine',
+    child: Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: cardTop,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cardTopBorder),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    sectionLine,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Expanded(
-                      child: Container(
-                        color: cardTop,
-                        padding: EdgeInsets.symmetric(
-                            horizontal: padH, vertical: padV),
-                        alignment: Alignment.topLeft,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 4,
-                              overflow: TextOverflow.ellipsis,
-                              textScaler: scaler,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: titleSize,
-                                height: 1.2,
-                              ),
-                            ),
-                            SizedBox(height: padV * 0.35),
-                            Text(
-                              sectionLine,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textScaler: scaler,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontSize: subSize,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+            ),
+            Container(
+              color: footerBar,
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      footerLine,
+                      style: TextStyle(color: footerText, fontSize: 14),
                     ),
-                    Container(
-                      color: footerBar,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: padH.clamp(10.0, 12.0),
-                        vertical: (padV * 0.65).clamp(8.0, 11.0),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              footerLine,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textScaler: scaler,
-                              style: TextStyle(
-                                color: footerText,
-                                fontSize: subSize,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          Icon(Icons.chevron_right,
-                              color: chevron, size: 20 + padH * 0.1),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right, color: chevron),
+                ],
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          ],
+        ),
+      ),
+    ),
+  );
 }

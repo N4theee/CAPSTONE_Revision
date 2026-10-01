@@ -215,6 +215,8 @@ class ExamRankingRow {
     this.remarks,
     this.completionSeconds,
     this.violationCount = 0,
+    this.startedAt,
+    this.finishedAt,
   });
 
   final String studentId;
@@ -227,6 +229,8 @@ class ExamRankingRow {
   final String? remarks;
   final int? completionSeconds;
   final int violationCount;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
 }
 
 class StudentExamHistoryItem {
@@ -1546,7 +1550,7 @@ class ExamService {
       try {
         final attemptsRaw = await _db
             .from('exam_attempts')
-            .select('student_id, completion_seconds, violation_count')
+            .select('student_id, completion_seconds, violation_count, started_at, submitted_at, ended_at')
             .eq('exam_session_id', examSessionId)
             .eq('status', 'completed');
         for (final row in attemptsRaw) {
@@ -1571,6 +1575,11 @@ class ExamService {
             (att?['violation_count'] as num?)?.toInt() ??
             (m['violation_penalty'] as num?)?.toInt() ??
             0;
+        final startedAt = tryParseDbTimestamptzToLocal(att?['started_at']);
+        final submittedAt = tryParseDbTimestamptzToLocal(att?['submitted_at']);
+        final endedAt = tryParseDbTimestamptzToLocal(att?['ended_at']);
+        final finishedAt = submittedAt ?? endedAt;
+        
         return ExamRankingRow(
           studentId: sid,
           studentName: name,
@@ -1582,6 +1591,8 @@ class ExamService {
           remarks: (m['remarks'] as String?)?.trim(),
           completionSeconds: completionSeconds,
           violationCount: violationCount,
+          startedAt: startedAt,
+          finishedAt: finishedAt,
         );
       }).toList();
 

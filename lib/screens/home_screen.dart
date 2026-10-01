@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../ui/landing_auth_ui.dart';
 import '../ui/responsive.dart';
+
 import '../util/network_connectivity.dart';
 import 'admin_web_panel_screen.dart';
 import 'auth_screen.dart';
@@ -55,10 +56,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         children: [
                           SizedBox(height: c.maxHeight * 0.04),
-                          const _AttendximityHeroIcon(),
+                          const _ProxamityHeroIcon(),
                           const SizedBox(height: 22),
                           const Text(
-                            'Attendximity',
+                            'Proxamity',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white,
@@ -99,10 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 14),
                             _GradientBorderRoleCard(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF8B5CF6),
-                                  Color(0xFF6B21A8),
-                                ],
+                                colors: [Color(0xFF8B5CF6), Color(0xFF6B21A8)],
                               ),
                               icon: Icons.admin_panel_settings_rounded,
                               title: 'Admin Panel (Web)',
@@ -136,11 +134,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final ok = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: LandingAuthUi.surface,
       builder: (ctx) => Theme(
         data: themed,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + MediaQuery.viewInsetsOf(ctx).bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -181,9 +186,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (!ctx.mounted) return;
                     final msg = networkErrorMessage(e);
                     if (msg != null) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text(msg)),
-                      );
+                      ScaffoldMessenger.of(
+                        ctx,
+                      ).showSnackBar(SnackBar(content: Text(msg)));
                     } else {
                       Navigator.pop(ctx, false);
                     }
@@ -211,8 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _AttendximityHeroIcon extends StatelessWidget {
-  const _AttendximityHeroIcon();
+class _ProxamityHeroIcon extends StatelessWidget {
+  const _ProxamityHeroIcon();
 
   @override
   Widget build(BuildContext context) {
@@ -318,8 +323,10 @@ class _GradientBorderRoleCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16.4),
               ),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 18,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -327,9 +334,7 @@ class _GradientBorderRoleCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: LandingAuthUi.surfaceMuted,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: LandingAuthUi.borderSubtle,
-                        ),
+                        border: Border.all(color: LandingAuthUi.borderSubtle),
                       ),
                       child: Icon(icon, color: Colors.white, size: 26),
                     ),
@@ -351,8 +356,9 @@ class _GradientBorderRoleCard extends StatelessWidget {
                             subtitle,
                             style: TextStyle(
                               fontSize: 12,
-                              color: LandingAuthUi.textSecondary
-                                  .withValues(alpha: 0.95),
+                              color: LandingAuthUi.textSecondary.withValues(
+                                alpha: 0.95,
+                              ),
                               height: 1.3,
                             ),
                             maxLines: 2,
@@ -412,7 +418,8 @@ class _LandingBackdropPainter extends CustomPainter {
       final yBase = size.height * (0.08 + i * 0.045);
       path.moveTo(0, yBase);
       for (double x = 0; x <= size.width; x += 6) {
-        final y = yBase +
+        final y =
+            yBase +
             math.sin((x / size.width) * math.pi * 3 + i * 0.8) * (10 + i * 3);
         path.lineTo(x, y);
       }

@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -94,7 +95,10 @@ class _TeacherScreenState extends State<TeacherScreen>
         _active = true;
         _loading = false;
       });
-      _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 4),
+        (_) => _refresh(),
+      );
       await _refresh();
     } catch (e) {
       setState(() => _loading = false);
@@ -132,8 +136,8 @@ class _TeacherScreenState extends State<TeacherScreen>
     }
   }
 
-  void _toast(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   /// BLE local name when starting a session (matches DB session `beacon_name`).
   String _effectiveAdvertisedBeaconName() {
@@ -179,12 +183,18 @@ class _TeacherScreenState extends State<TeacherScreen>
               const SizedBox(height: 8),
               Text(
                 'Advertised name (BLE)\n${_effectiveAdvertisedBeaconName()}',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'RSSI threshold for this session is −100. Students must be in range of this beacon.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -229,154 +239,157 @@ class _TeacherScreenState extends State<TeacherScreen>
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 28 + bottomInset),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _CourseHeroCard(
-              courseTitle: courseTitle,
-              subline: subline,
-              active: _active,
-              accent: _accent,
-              success: _success,
-              cardColor: _card,
-            ),
-            const SizedBox(height: 20),
-            _loading
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(color: _accent),
-                    ),
-                  )
-                : _GradientSessionButton(
-                    active: _active,
-                    onPressed: _active ? _endSession : _startSession,
-                  ),
-            const SizedBox(height: 8),
-            Text(
-              'Students can only join when session is active',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.45),
+      body: ResponsivePage(
+        maxWidth: 1040,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 28 + bottomInset),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _CourseHeroCard(
+                courseTitle: courseTitle,
+                subline: subline,
+                active: _active,
+                accent: _accent,
+                success: _success,
+                cardColor: _card,
               ),
-            ),
-            const SizedBox(height: 20),
-            LayoutBuilder(
-              builder: (context, c) {
-                final narrow = c.maxWidth < 380;
-                final studentCard = _StatMiniCard(
-                  icon: Icons.groups_rounded,
-                  value: '${_attendees.length}',
-                  title: 'Students',
-                  subtitle: 'Connected',
-                  accent: _accent,
-                  card: _card,
-                );
-                final proximityCard = _StatMiniCard(
-                  icon: Icons.near_me_rounded,
-                  value: '',
-                  title: 'Proximity',
-                  subtitle: _active
-                      ? 'Scanning for nearby students'
-                      : 'Start session to scan',
-                  accent: _accent,
-                  card: _card,
-                  footer: _active
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: _success,
-                                shape: BoxShape.circle,
+              const SizedBox(height: 20),
+              _loading
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(color: _accent),
+                      ),
+                    )
+                  : _GradientSessionButton(
+                      active: _active,
+                      onPressed: _active ? _endSession : _startSession,
+                    ),
+              const SizedBox(height: 8),
+              Text(
+                'Students can only join when session is active',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+              ),
+              const SizedBox(height: 20),
+              LayoutBuilder(
+                builder: (context, c) {
+                  final narrow = c.maxWidth < 380;
+                  final studentCard = _StatMiniCard(
+                    icon: Icons.groups_rounded,
+                    value: '${_attendees.length}',
+                    title: 'Students',
+                    subtitle: 'Connected',
+                    accent: _accent,
+                    card: _card,
+                  );
+                  final proximityCard = _StatMiniCard(
+                    icon: Icons.near_me_rounded,
+                    value: '',
+                    title: 'Proximity',
+                    subtitle: _active
+                        ? 'Scanning for nearby students'
+                        : 'Start session to scan',
+                    accent: _accent,
+                    card: _card,
+                    footer: _active
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: _success,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Active',
-                              style: TextStyle(
-                                color: _success,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Active',
+                                style: TextStyle(
+                                  color: _success,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
+                            ],
+                          )
+                        : Text(
+                            'Idle',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              fontSize: 12,
                             ),
-                          ],
-                        )
-                      : Text(
-                          'Idle',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            fontSize: 12,
                           ),
-                        ),
-                );
-                if (narrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  );
+                  if (narrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        studentCard,
+                        const SizedBox(height: 12),
+                        proximityCard,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      studentCard,
-                      const SizedBox(height: 12),
-                      proximityCard,
+                      Expanded(child: studentCard),
+                      const SizedBox(width: 12),
+                      Expanded(child: proximityCard),
                     ],
                   );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: studentCard),
-                    const SizedBox(width: 12),
-                    Expanded(child: proximityCard),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _active
-                  ? 'Scanning for nearby students...'
-                  : 'Proximity radar is idle',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
+                },
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Make sure students are within proximity',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.45),
+              const SizedBox(height: 24),
+              Text(
+                _active
+                    ? 'Scanning for nearby students...'
+                    : 'Proximity radar is idle',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _TeacherRadar(
-              height: radarH,
-              animation: _radarController,
-              active: _active,
-              dotCount: _attendees.length,
-              accent: _accent,
-              accent2: _accent2,
-            ),
-            const SizedBox(height: 20),
-            _AttendeesExpansion(
-              count: _attendees.length,
-              cardColor: _card,
-              accent: _accent,
-              active: _active,
-              attendees: _attendees,
-              anomalies: _anomalies,
-            ),
-            const SizedBox(height: 16),
-            _HowItWorksCard(card: _card, accent: _accent),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                'Make sure students are within proximity',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _TeacherRadar(
+                height: radarH,
+                animation: _radarController,
+                active: _active,
+                dotCount: _attendees.length,
+                accent: _accent,
+                accent2: _accent2,
+              ),
+              const SizedBox(height: 20),
+              _AttendeesExpansion(
+                count: _attendees.length,
+                cardColor: _card,
+                accent: _accent,
+                active: _active,
+                attendees: _attendees,
+                anomalies: _anomalies,
+              ),
+              const SizedBox(height: 16),
+              _HowItWorksCard(card: _card, accent: _accent),
+            ],
+          ),
         ),
       ),
     );
@@ -461,7 +474,9 @@ class _CourseHeroCard extends StatelessWidget {
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: active
                             ? success.withValues(alpha: 0.15)
@@ -473,8 +488,8 @@ class _CourseHeroCard extends StatelessWidget {
                               : Colors.white.withValues(alpha: 0.08),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Icon(
                             Icons.wifi_tethering,
@@ -515,10 +530,7 @@ class _CourseHeroCard extends StatelessWidget {
 }
 
 class _GradientSessionButton extends StatelessWidget {
-  const _GradientSessionButton({
-    required this.active,
-    required this.onPressed,
-  });
+  const _GradientSessionButton({required this.active, required this.onPressed});
 
   final bool active;
   final VoidCallback onPressed;
@@ -561,11 +573,15 @@ class _GradientSessionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: const [
-                Icon(Icons.play_circle_fill_rounded,
-                    color: Colors.white, size: 26),
+                Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
                 SizedBox(width: 10),
                 Text(
                   'Start Session',
@@ -654,10 +670,7 @@ class _StatMiniCard extends StatelessWidget {
               height: 1.3,
             ),
           ),
-          if (footer != null) ...[
-            const SizedBox(height: 10),
-            footer!,
-          ],
+          if (footer != null) ...[const SizedBox(height: 10), footer!],
         ],
       ),
     );
@@ -683,9 +696,7 @@ class _TeacherRadar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayDots = active
-        ? (dotCount > 0 ? math.min(dotCount, 6) : 3)
-        : 0;
+    final displayDots = active ? (dotCount > 0 ? math.min(dotCount, 6) : 3) : 0;
     final hub = (height * 0.27).clamp(52.0, 72.0);
     final iconSize = (hub * 0.48).clamp(26.0, 36.0);
     return SizedBox(
@@ -707,9 +718,7 @@ class _TeacherRadar extends StatelessWidget {
                 height: hub,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [accent, accent2],
-                  ),
+                  gradient: LinearGradient(colors: [accent, accent2]),
                   boxShadow: [
                     BoxShadow(
                       color: accent.withValues(alpha: 0.4),
@@ -718,8 +727,11 @@ class _TeacherRadar extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Icon(Icons.groups_rounded,
-                    color: Colors.white, size: iconSize),
+                child: Icon(
+                  Icons.groups_rounded,
+                  color: Colors.white,
+                  size: iconSize,
+                ),
               ),
             ),
           );
@@ -781,11 +793,7 @@ class _RadarPainter extends CustomPainter {
       final glow = Paint()
         ..color = Colors.white.withValues(alpha: active ? 0.85 : 0.35);
       canvas.drawCircle(p, 5, glow);
-      canvas.drawCircle(
-        p,
-        3,
-        Paint()..color = accent.withValues(alpha: 0.9),
-      );
+      canvas.drawCircle(p, 3, Paint()..color = accent.withValues(alpha: 0.9));
     }
   }
 
@@ -833,14 +841,15 @@ class _AttendeesExpansion extends StatelessWidget {
             color: accent.withValues(alpha: 0.25),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.groups_rounded, color: Colors.white, size: 20),
+          child: const Icon(
+            Icons.groups_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
         title: const Text(
           'View Attendees',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -875,10 +884,14 @@ class _AttendeesExpansion extends StatelessWidget {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF7F1D1D).withValues(alpha: 0.22),
+                          color: const Color(
+                            0xFF7F1D1D,
+                          ).withValues(alpha: 0.22),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFFFCA5A5).withValues(alpha: 0.5),
+                            color: const Color(
+                              0xFFFCA5A5,
+                            ).withValues(alpha: 0.5),
                           ),
                         ),
                         child: Text(
@@ -942,10 +955,15 @@ class _AttendeesExpansion extends StatelessWidget {
                   ),
                   subtitle: Text(
                     [
-                      if ((a['device_name'] as String?)?.trim().isNotEmpty ?? false)
+                      if ((a['device_name'] as String?)?.trim().isNotEmpty ??
+                          false)
                         'Device: ${a['device_name']}',
-                      if (!((a['device_name'] as String?)?.trim().isNotEmpty ?? false) &&
-                          ((a['device_fingerprint'] as String?)?.trim().isNotEmpty ?? false))
+                      if (!((a['device_name'] as String?)?.trim().isNotEmpty ??
+                              false) &&
+                          ((a['device_fingerprint'] as String?)
+                                  ?.trim()
+                                  .isNotEmpty ??
+                              false))
                         'Device fingerprint on file',
                     ].join('\n'),
                     style: TextStyle(
@@ -995,8 +1013,11 @@ class _HowItWorksCard extends StatelessWidget {
               color: accent.withValues(alpha: 0.25),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.verified_user_rounded,
-                color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.verified_user_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1023,8 +1044,11 @@ class _HowItWorksCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.smartphone_rounded,
-              color: Colors.white.withValues(alpha: 0.2), size: 40),
+          Icon(
+            Icons.smartphone_rounded,
+            color: Colors.white.withValues(alpha: 0.2),
+            size: 40,
+          ),
         ],
       ),
     );

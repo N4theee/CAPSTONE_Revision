@@ -28,7 +28,7 @@
         android:required="true" />
 
     <application
-        android:label="Attendximity"
+        android:label="Proxamity"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

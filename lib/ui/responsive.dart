@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 class AppBreakpoints {
   AppBreakpoints._();
 
-  static double width(BuildContext context) =>
-      MediaQuery.sizeOf(context).width;
+  static double width(BuildContext context) => MediaQuery.sizeOf(context).width;
 
   static double height(BuildContext context) =>
       MediaQuery.sizeOf(context).height;
@@ -69,14 +68,14 @@ class AppBreakpoints {
   /// Fixed row height for history grid tiles (avoids aspect-ratio overflows).
   static double historySessionTileExtent(BuildContext context, int cols) {
     final raw = MediaQuery.textScalerOf(context).scale(1.0);
-    final s = raw.clamp(0.85, 1.75);
+    final s = raw < 1 ? 1.0 : raw;
     switch (cols) {
       case 1:
-        return (132 * s).clamp(120.0, 220.0);
+        return 190 * s;
       case 2:
-        return (144 * s).clamp(128.0, 240.0);
+        return 210 * s;
       default:
-        return (158 * s).clamp(138.0, 260.0);
+        return 230 * s;
     }
   }
 

@@ -1,3 +1,4 @@
+import '../ui/adaptive_layout.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -31,7 +32,8 @@ class StudentExamMonitoringScreen extends StatefulWidget {
       _StudentExamMonitoringScreenState();
 }
 
-class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScreen>
+class _StudentExamMonitoringScreenState
+    extends State<StudentExamMonitoringScreen>
     with WidgetsBindingObserver {
   final _exam = ExamService();
   final _ble = BleService();
@@ -68,9 +70,9 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   String get _sessionStatus => _liveSession?.status ?? widget.session.status;
 
   String get _displayStatusLabel => ExamService.studentExamStatusLabel(
-        attemptStatus: _attemptStatus,
-        sessionStatus: _sessionStatus,
-      );
+    attemptStatus: _attemptStatus,
+    sessionStatus: _sessionStatus,
+  );
 
   String get _appBarTitle {
     if (_sessionEnded || _liveSession?.isTerminal == true) {
@@ -89,9 +91,9 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
   }
 
   String get _beaconUuid => ExamService.resolveBeaconUuid(
-        session: widget.session,
-        offeringBeaconUuid: widget.offering.beaconUuid,
-      );
+    session: widget.session,
+    offeringBeaconUuid: widget.offering.beaconUuid,
+  );
 
   int get _rssiThreshold => widget.session.rssiThreshold;
 
@@ -226,8 +228,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
         : 'ended by your teacher';
     await _finishMonitoring(
       status: _attemptStatus,
-      message:
-          'The exam session was $endedLabel. You can leave this screen.',
+      message: 'The exam session was $endedLabel. You can leave this screen.',
     );
   }
 
@@ -343,12 +344,21 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
           children: [
             Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent),
             SizedBox(width: 8),
-            Text('Out of range'),
+            Expanded(
+              child: Text(
+                'Out of range',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
         content: Text(
           'You left the exam proximity zone. Return within '
           '${widget.session.gracePeriodSeconds} seconds or your attempt will end automatically.',
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           FilledButton(
@@ -382,8 +392,14 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: StudentAttendanceUi.surfaceElevated,
-        title: Text(title),
-        content: Text(body, style: ExamUi.body(ctx)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(body, style: const TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -456,8 +472,9 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
     final subjectLabel =
         '${widget.offering.subjectCode} - ${widget.offering.subjectTitle}';
     final statusLabel = _inRange ? 'In Range' : 'Out of Range';
-    final statusColor =
-        _inRange ? StudentAttendanceUi.success : Colors.orangeAccent;
+    final statusColor = _inRange
+        ? StudentAttendanceUi.success
+        : Colors.orangeAccent;
 
     return PopScope(
       canPop: _ended,
@@ -467,9 +484,16 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: StudentAttendanceUi.surfaceElevated,
-            title: const Text('Leave exam?'),
+            title: const Text(
+              'Leave exam?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             content: const Text(
               'Proximity monitoring is still active. Leaving may count as out of range.',
+              style: TextStyle(color: Colors.white70),
             ),
             actions: [
               TextButton(
@@ -492,170 +516,176 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
       },
       child: Theme(
         data: ExamUi.studentThemeOverlay(Theme.of(context)),
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text(_appBarTitle),
-          ),
-          body: ListView(
-            padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
-            children: [
-              Text(
-                widget.session.examTitle,
-                style: ExamUi.titleMedium(context)?.copyWith(fontSize: 20),
-              ),
-              const SizedBox(height: 6),
-              Text(subjectLabel, style: ExamUi.bodySecondary(context)),
-              Text(
-                'Code ${widget.session.examCode} • Section ${widget.offering.section}',
-                style: ExamUi.bodySecondary(context),
-              ),
-              if (_sessionEnded || _liveSession?.isTerminal == true) ...[
-                Card(
-                  color: Colors.orangeAccent.withValues(alpha: 0.12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.event_busy_rounded,
-                          color: Colors.orangeAccent,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Session $_sessionStatus. '
-                            'Status: $_displayStatusLabel',
-                            style: ExamUi.body(context),
+        child: Builder(
+          builder: (context) {
+            return Scaffold(
+              appBar: AppBar(title: Text(_appBarTitle)),
+              body: ResponsivePage(
+                maxWidth: 1040,
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 32),
+                  children: [
+                    Text(
+                      widget.session.examTitle,
+                      style: ExamUi.titleMedium(
+                        context,
+                      )?.copyWith(fontSize: 20),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(subjectLabel, style: ExamUi.bodySecondary(context)),
+                    Text(
+                      'Code ${widget.session.examCode} • Section ${widget.offering.section}',
+                      style: ExamUi.bodySecondary(context),
+                    ),
+                    if (_sessionEnded || _liveSession?.isTerminal == true) ...[
+                      Card(
+                        color: Colors.orangeAccent.withValues(alpha: 0.12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.event_busy_rounded,
+                                color: Colors.orangeAccent,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Session $_sessionStatus. '
+                                  'Status: $_displayStatusLabel',
+                                  style: ExamUi.body(context),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _sessionEnded
-                            ? Icons.event_busy_rounded
-                            : (_inRange
-                                ? Icons.sensors_rounded
-                                : Icons.sensors_off_rounded),
-                        size: 48,
-                        color: _sessionEnded
-                            ? Colors.orangeAccent
-                            : statusColor,
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        _sessionEnded ? _displayStatusLabel : statusLabel,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: _sessionEnded
-                              ? Colors.orangeAccent
-                              : statusColor,
-                        ),
-                      ),
-                      if (_rssi != null && !_sessionEnded) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'RSSI $_rssi (threshold $_rssiThreshold)',
-                          style: ExamUi.bodySecondary(context),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        'Exam: $_displayStatusLabel • Violations: $_violationCount',
-                        style: ExamUi.bodySecondary(context),
-                      ),
-                      if (!_sessionEnded) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end',
-                          textAlign: TextAlign.center,
-                          style: ExamUi.bodySecondary(context),
-                        ),
-                      ],
                     ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (_questionCount != null && _questionCount! > 0) ...[
-                if (_submittedMcq)
-                  Card(
-                    color: StudentAttendanceUi.success.withValues(alpha: 0.12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Exam answers submitted. Proximity monitoring continues until the session ends.',
-                            style: ExamUi.body(context),
-                          ),
-                          if (_submittedAttempt != null) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Icon(
+                              _sessionEnded
+                                  ? Icons.event_busy_rounded
+                                  : (_inRange
+                                        ? Icons.sensors_rounded
+                                        : Icons.sensors_off_rounded),
+                              size: 48,
+                              color: _sessionEnded
+                                  ? Colors.orangeAccent
+                                  : statusColor,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _sessionEnded ? _displayStatusLabel : statusLabel,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: _sessionEnded
+                                    ? Colors.orangeAccent
+                                    : statusColor,
+                              ),
+                            ),
+                            if (_rssi != null && !_sessionEnded) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'RSSI $_rssi (threshold $_rssiThreshold)',
+                                style: ExamUi.bodySecondary(context),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             Text(
-                              'Score: ${_submittedAttempt!.percentageScore.toStringAsFixed(1)}% • '
-                              'Time: ${ExamService.formatCompletionTime(_submittedAttempt!.completionSeconds)}',
+                              'Exam: $_displayStatusLabel • Violations: $_violationCount',
                               style: ExamUi.bodySecondary(context),
                             ),
-                            Text(
-                              'Submitted: ${ExamUi.formatExamDateTime(
-                                ExamService.resolveAttemptSubmittedAt(
-                                  submittedAt: _submittedAttempt!.submittedAt,
-                                  endedAt: _submittedAttempt!.endedAt,
-                                ),
-                              )}',
-                              style: ExamUi.bodySecondary(context),
-                            ),
+                            if (!_sessionEnded) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end',
+                                textAlign: TextAlign.center,
+                                style: ExamUi.bodySecondary(context),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  )
-                else if (!_sessionEnded)
-                  FilledButton.icon(
-                    onPressed: _openTakeExam,
-                    icon: const Icon(Icons.edit_note_rounded),
-                    label: Text(
-                      'Answer exam ($_questionCount questions)',
-                    ),
-                  ),
-                const SizedBox(height: 12),
-              ] else if (_questionCount == 0 && !_sessionEnded)
-                Text(
-                  'Waiting for exam questions from your teacher.',
-                  textAlign: TextAlign.center,
-                  style: ExamUi.bodySecondary(context),
+                    const SizedBox(height: 16),
+                    if (_questionCount != null && _questionCount! > 0) ...[
+                      if (_submittedMcq)
+                        Card(
+                          color: StudentAttendanceUi.success.withValues(
+                            alpha: 0.12,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Exam answers submitted. Proximity monitoring continues until the session ends.',
+                                  style: ExamUi.body(context),
+                                ),
+                                if (_submittedAttempt != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Score: ${_submittedAttempt!.percentageScore.toStringAsFixed(1)}% • '
+                                    'Time: ${ExamService.formatCompletionTime(_submittedAttempt!.completionSeconds)}',
+                                    style: ExamUi.bodySecondary(context),
+                                  ),
+                                  Text(
+                                    'Submitted: ${ExamUi.formatExamDateTime(ExamService.resolveAttemptSubmittedAt(submittedAt: _submittedAttempt!.submittedAt, endedAt: _submittedAttempt!.endedAt))}',
+                                    style: ExamUi.bodySecondary(context),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (!_sessionEnded)
+                        FilledButton.icon(
+                          onPressed: _openTakeExam,
+                          icon: const Icon(Icons.edit_note_rounded),
+                          label: Text(
+                            'Answer exam ($_questionCount questions)',
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                    ] else if (_questionCount == 0 && !_sessionEnded)
+                      Text(
+                        'Waiting for exam questions from your teacher.',
+                        textAlign: TextAlign.center,
+                        style: ExamUi.bodySecondary(context),
+                      ),
+                    if (!_sessionEnded)
+                      Text(
+                        'Stay near the teacher device. Brief signal drops are ignored for '
+                        '${AppConfig.examProximitySmoothingSeconds}s. '
+                        'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end.',
+                        textAlign: TextAlign.center,
+                        style: ExamUi.bodySecondary(
+                          context,
+                        )?.copyWith(height: 1.35),
+                      ),
+                    if (AppConfig.showExamBleDebugPanel) ...[
+                      const SizedBox(height: 16),
+                      _examBleDebugPanel(context),
+                    ],
+                  ],
                 ),
-              if (!_sessionEnded)
-                Text(
-                  'Stay near the teacher device. Brief signal drops are ignored for '
-                  '${AppConfig.examProximitySmoothingSeconds}s. '
-                  'Grace period: ${widget.session.gracePeriodSeconds}s out of range before auto-end.',
-                  textAlign: TextAlign.center,
-                  style: ExamUi.bodySecondary(context)?.copyWith(height: 1.35),
-                ),
-              if (AppConfig.showExamBleDebugPanel) ...[
-                const SizedBox(height: 16),
-                _examBleDebugPanel(),
-              ],
-            ],
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _examBleDebugPanel() {
+  Widget _examBleDebugPanel(BuildContext context) {
     final detectedRssi = _rssi;
     final threshold = _rssiThreshold;
     final inRangeNow = detectedRssi != null && detectedRssi >= threshold;
@@ -670,36 +700,45 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
           children: [
             Text(
               'BLE debug (dev)',
-              style: ExamUi.labelOnCard(context)?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: ExamUi.labelOnCard(
+                context,
+              )?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            _debugRow('Expected UUID', _beaconUuid),
-            _debugRow('Expected beacon name', _beaconAdvertisedName()),
-            _debugRow('Current threshold', '$threshold'),
-            _debugRow('Last detected RSSI', detectedRssi?.toString() ?? '—'),
+            _debugRow(context, 'Expected UUID', _beaconUuid),
+            _debugRow(context, 'Expected beacon name', _beaconAdvertisedName()),
+            _debugRow(context, 'Current threshold', '$threshold'),
             _debugRow(
+              context,
+              'Last detected RSSI',
+              detectedRssi?.toString() ?? '—',
+            ),
+            _debugRow(
+              context,
               'Found UUIDs',
               (match?.foundServiceUuids ?? const []).isEmpty
                   ? '—'
                   : match!.foundServiceUuids.join(', '),
             ),
-            _debugRow('Found beacon name', match?.beaconName ?? '—'),
+            _debugRow(context, 'Found beacon name', match?.beaconName ?? '—'),
             _debugRow(
+              context,
               'UUID matched',
               (match?.uuidMatched ?? false) ? 'true' : 'false',
             ),
             _debugRow(
+              context,
               'Name matched',
               (match?.nameMatched ?? false) ? 'true' : 'false',
             ),
-            _debugRow('Final inRange', _inRange ? 'true' : 'false'),
+            _debugRow(context, 'Final inRange', _inRange ? 'true' : 'false'),
             _debugRow(
+              context,
               'Signal inRange (RSSI)',
               inRangeNow ? 'true' : 'false',
             ),
             _debugRow(
+              context,
               'Last seen',
               _lastSeenInRangeAt?.toIso8601String() ?? '—',
             ),
@@ -709,7 +748,7 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
     );
   }
 
-  Widget _debugRow(String label, String value) {
+  Widget _debugRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
@@ -725,10 +764,9 @@ class _StudentExamMonitoringScreenState extends State<StudentExamMonitoringScree
           Expanded(
             child: Text(
               value,
-              style: ExamUi.bodySecondary(context)?.copyWith(
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
+              style: ExamUi.bodySecondary(
+                context,
+              )?.copyWith(fontSize: 11, fontFamily: 'monospace'),
             ),
           ),
         ],
