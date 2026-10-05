@@ -43,8 +43,7 @@ class ExamSession {
 
   bool get isPaused => status == 'paused';
 
-  bool get isTerminal =>
-      status == 'ended' || status == 'cancelled';
+  bool get isTerminal => status == 'ended' || status == 'cancelled';
 
   bool get isJoinable => status == 'active';
 }
@@ -81,8 +80,7 @@ class ExamAttempt {
   bool get isTerminal =>
       status == 'completed' || status == 'auto_ended' || status == 'flagged';
 
-  bool get canSubmitMcq =>
-      status == 'in_progress';
+  bool get canSubmitMcq => status == 'in_progress';
 }
 
 class ExamChoice {
@@ -273,9 +271,9 @@ class StudentExamHistoryItem {
 
   /// Human-readable status (accounts for teacher-ended session).
   String get displayStatus => ExamService.studentExamStatusLabel(
-        attemptStatus: status,
-        sessionStatus: sessionStatus,
-      );
+    attemptStatus: status,
+    sessionStatus: sessionStatus,
+  );
 }
 
 /// Thrown when exam validation or persistence fails in a user-visible way.
@@ -315,10 +313,13 @@ class ExamService {
       bleUuid: _jsonStr(m['ble_uuid']),
       rssiThreshold: (m['rssi_threshold'] as num?)?.toInt() ?? -85,
       gracePeriodSeconds: (m['grace_period_seconds'] as num?)?.toInt() ?? 30,
-      status: _jsonStr(m['status']).isEmpty ? 'scheduled' : _jsonStr(m['status']),
+      status: _jsonStr(m['status']).isEmpty
+          ? 'scheduled'
+          : _jsonStr(m['status']),
       startsAt: tryParseDbTimestamptzToLocal(m['starts_at']),
       endsAt: tryParseDbTimestamptzToLocal(m['ends_at']),
-      createdAt: tryParseDbTimestamptzToLocal(m['created_at']) ?? DateTime.now(),
+      createdAt:
+          tryParseDbTimestamptzToLocal(m['created_at']) ?? DateTime.now(),
       durationMinutes: (m['duration_minutes'] as num?)?.toInt() ?? 60,
     );
   }
@@ -328,14 +329,17 @@ class ExamService {
       id: _jsonStr(m['id']),
       examSessionId: _jsonStr(m['exam_session_id']),
       studentId: _jsonStr(m['student_id']),
-      status: _jsonStr(m['status']).isEmpty ? 'in_progress' : _jsonStr(m['status']),
+      status: _jsonStr(m['status']).isEmpty
+          ? 'in_progress'
+          : _jsonStr(m['status']),
       startedAt:
           tryParseDbTimestamptzToLocal(m['started_at']) ?? DateTime.now(),
       endedAt: tryParseDbTimestamptzToLocal(m['ended_at']),
       violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
       rawScore: (m['raw_score'] as num?)?.toInt() ?? 0,
       totalPoints: (m['total_points'] as num?)?.toInt() ?? 0,
-      percentageScore: (m['percentage_score'] as num?)?.toDouble() ??
+      percentageScore:
+          (m['percentage_score'] as num?)?.toDouble() ??
           (m['exam_score'] as num?)?.toDouble() ??
           0,
       completionSeconds: (m['completion_seconds'] as num?)?.toInt() ?? 0,
@@ -379,10 +383,7 @@ class ExamService {
   }
 
   String _defaultExamAlertMessage(String alertType) {
-    return teacherAlertMessage(
-      alertType: alertType,
-      studentName: 'A student',
-    );
+    return teacherAlertMessage(alertType: alertType, studentName: 'A student');
   }
 
   /// Teacher/proctor-facing alert copy (also used as default DB message).
@@ -506,9 +507,11 @@ class ExamService {
           .eq('status', 'active')
           .order('created_at', ascending: false);
       return rows
-          .map((e) => _examSessionFromMap(
-                Map<String, dynamic>.from(e as Map<dynamic, dynamic>),
-              ))
+          .map(
+            (e) => _examSessionFromMap(
+              Map<String, dynamic>.from(e as Map<dynamic, dynamic>),
+            ),
+          )
           .toList();
     } catch (e) {
       _rethrowPostgrest(e, 'getActiveExamSessionsBySubjectOffering failed');
@@ -516,7 +519,9 @@ class ExamService {
   }
 
   /// Latest active or scheduled session (teacher hub convenience).
-  Future<ExamSession?> getActiveExamSessionForOffering(String offeringId) async {
+  Future<ExamSession?> getActiveExamSessionForOffering(
+    String offeringId,
+  ) async {
     try {
       final rows = await _db
           .from('exam_sessions')
@@ -534,7 +539,9 @@ class ExamService {
     }
   }
 
-  Future<List<ExamSession>> getExamSessionsForOffering(String offeringId) async {
+  Future<List<ExamSession>> getExamSessionsForOffering(
+    String offeringId,
+  ) async {
     try {
       final rows = await _db
           .from('exam_sessions')
@@ -542,9 +549,11 @@ class ExamService {
           .eq('subject_offering_id', offeringId)
           .order('created_at', ascending: false);
       return rows
-          .map((e) => _examSessionFromMap(
-                Map<String, dynamic>.from(e as Map<dynamic, dynamic>),
-              ))
+          .map(
+            (e) => _examSessionFromMap(
+              Map<String, dynamic>.from(e as Map<dynamic, dynamic>),
+            ),
+          )
           .toList();
     } catch (e) {
       _rethrowPostgrest(e, 'getExamSessionsForOffering failed');
@@ -675,19 +684,9 @@ class ExamService {
       }
 
       if (session.status == 'scheduled') {
-        final now = DateTime.now().toUtc();
-        final start = session.startsAt?.toUtc();
-        if (start == null || !start.isAfter(now)) {
-          await activateExamSession(session.id);
-          final refreshed = await getExamSessionById(session.id);
-          if (refreshed == null) {
-            throw ExamServiceException('Could not activate exam session.');
-          }
-          return refreshed;
-        }
         throw ExamServiceException(
-          'Exam is scheduled for later (${_fmtLocal(session.startsAt)}). '
-          'Ask your teacher to start the exam now.',
+          'This exam has not started. Ask your teacher to open Exam Active '
+          'and start it with Bluetooth ready.',
         );
       }
 
@@ -727,14 +726,6 @@ class ExamService {
     } catch (e) {
       _rethrowPostgrest(e, 'validateExamCode failed');
     }
-  }
-
-  String _fmtLocal(DateTime? dt) {
-    if (dt == null) return '—';
-    final l = dt.toLocal();
-    return '${l.year}-${l.month.toString().padLeft(2, '0')}-'
-        '${l.day.toString().padLeft(2, '0')} '
-        '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
   }
 
   Future<bool> isStudentEnrolledInOffering(
@@ -801,7 +792,9 @@ class ExamService {
       );
       if (existing != null) {
         if (existing.status == 'in_progress') {
-          debugPrint('[ExamService] Reusing in_progress attempt ${existing.id}');
+          debugPrint(
+            '[ExamService] Reusing in_progress attempt ${existing.id}',
+          );
           return existing;
         }
         throw ExamServiceException(
@@ -911,12 +904,7 @@ class ExamService {
     DateTime? endedAt,
     int? violationCount,
   }) async {
-    const allowed = {
-      'in_progress',
-      'completed',
-      'flagged',
-      'auto_ended',
-    };
+    const allowed = {'in_progress', 'completed', 'flagged', 'auto_ended'};
     if (!allowed.contains(status)) {
       throw ExamServiceException('Invalid attempt status: $status');
     }
@@ -975,19 +963,19 @@ class ExamService {
             .eq('exam_session_id', examSessionId)
             .order('created_at', ascending: false)
             .listen(
-          (rows) {
-            if (controller.isClosed) return;
-            controller.add(rows.map(_examAlertFromMap).toList());
-          },
-          onError: (Object e, StackTrace st) {
-            debugPrint('[ExamService] listenToExamAlerts stream: $e\n$st');
-            if (useStream) {
-              useStream = false;
-              sub?.cancel();
-              startPolling();
-            }
-          },
-        );
+              (rows) {
+                if (controller.isClosed) return;
+                controller.add(rows.map(_examAlertFromMap).toList());
+              },
+              onError: (Object e, StackTrace st) {
+                debugPrint('[ExamService] listenToExamAlerts stream: $e\n$st');
+                if (useStream) {
+                  useStream = false;
+                  sub?.cancel();
+                  startPolling();
+                }
+              },
+            );
       } catch (e, st) {
         debugPrint('[ExamService] listenToExamAlerts setup: $e\n$st');
         useStream = false;
@@ -1136,9 +1124,11 @@ class ExamService {
       if (qRows.isEmpty) return [];
 
       final questionIds = qRows
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
 
@@ -1285,8 +1275,9 @@ class ExamService {
         });
       }
 
-      final percentageScore =
-          totalPoints > 0 ? (rawScore / totalPoints) * 100.0 : 0.0;
+      final percentageScore = totalPoints > 0
+          ? (rawScore / totalPoints) * 100.0
+          : 0.0;
       final submittedAtUtc = DateTime.now().toUtc();
       final submittedIso = submittedAtUtc.toIso8601String();
       final completionSeconds = completionSecondsBetween(
@@ -1294,21 +1285,23 @@ class ExamService {
         submittedAt: submittedAtUtc,
       );
 
-      await _db.from('exam_answers').upsert(
-        answerRows,
-        onConflict: 'exam_attempt_id,exam_question_id',
-      );
+      await _db
+          .from('exam_answers')
+          .upsert(answerRows, onConflict: 'exam_attempt_id,exam_question_id');
 
-      await _db.from('exam_attempts').update({
-        'status': 'completed',
-        'raw_score': rawScore,
-        'total_points': totalPoints,
-        'percentage_score': percentageScore,
-        'exam_score': percentageScore,
-        'completion_seconds': completionSeconds,
-        'submitted_at': submittedIso,
-        'ended_at': submittedIso,
-      }).eq('id', attemptId);
+      await _db
+          .from('exam_attempts')
+          .update({
+            'status': 'completed',
+            'raw_score': rawScore,
+            'total_points': totalPoints,
+            'percentage_score': percentageScore,
+            'exam_score': percentageScore,
+            'completion_seconds': completionSeconds,
+            'submitted_at': submittedIso,
+            'ended_at': submittedIso,
+          })
+          .eq('id', attemptId);
 
       await recomputeExamRankingsForSession(attempt.examSessionId);
 
@@ -1342,17 +1335,21 @@ class ExamService {
           .eq('exam_session_id', examSessionId)
           .eq('status', 'completed');
 
-      final ranked = <({
-        String studentId,
-        String studentName,
-        double percentageScore,
-        int completionSeconds,
-        int violationCount,
-      })>[];
+      final ranked =
+          <
+            ({
+              String studentId,
+              String studentName,
+              double percentageScore,
+              int completionSeconds,
+              int violationCount,
+            })
+          >[];
 
       for (final row in attemptsRaw) {
         final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
-        final pct = (m['percentage_score'] as num?)?.toDouble() ??
+        final pct =
+            (m['percentage_score'] as num?)?.toDouble() ??
             (m['exam_score'] as num?)?.toDouble() ??
             0;
         final students = m['students'];
@@ -1388,19 +1385,16 @@ class ExamService {
         final speedPoints = r.completionSeconds > 0
             ? (10000 / r.completionSeconds).clamp(0.0, 9999.0)
             : 0.0;
-        await _db.from('exam_rankings').upsert(
-          {
-            'exam_session_id': examSessionId,
-            'student_id': r.studentId,
-            'exam_score': r.percentageScore,
-            'speed_points': speedPoints,
-            'violation_penalty': r.violationCount.toDouble(),
-            'overall_score': r.percentageScore,
-            'rank_number': rankNum,
-            'remarks': remarks,
-          },
-          onConflict: 'exam_session_id,student_id',
-        );
+        await _db.from('exam_rankings').upsert({
+          'exam_session_id': examSessionId,
+          'student_id': r.studentId,
+          'exam_score': r.percentageScore,
+          'speed_points': speedPoints,
+          'violation_penalty': r.violationCount.toDouble(),
+          'overall_score': r.percentageScore,
+          'rank_number': rankNum,
+          'remarks': remarks,
+        }, onConflict: 'exam_session_id,student_id');
       }
       debugPrint(
         '[ExamService] Recomputed ${ranked.length} rankings for $examSessionId',
@@ -1439,10 +1433,7 @@ class ExamService {
     required DateTime startedAt,
     required DateTime submittedAt,
   }) {
-    final seconds = submittedAt
-        .toUtc()
-        .difference(startedAt.toUtc())
-        .inSeconds;
+    final seconds = submittedAt.toUtc().difference(startedAt.toUtc()).inSeconds;
     if (seconds < 0) return 0;
     return seconds.clamp(0, 86400);
   }
@@ -1526,10 +1517,13 @@ class ExamService {
       endedAt: endedAt,
       submittedAt: submittedAt,
       violationCount: (m['violation_count'] as num?)?.toInt() ?? 0,
-      percentageScore: (m['percentage_score'] as num?)?.toDouble() ??
+      percentageScore:
+          (m['percentage_score'] as num?)?.toDouble() ??
           (m['exam_score'] as num?)?.toDouble(),
       completionSeconds: completionSeconds,
-      sessionStatus: _jsonStr(sm['status']).isEmpty ? null : _jsonStr(sm['status']),
+      sessionStatus: _jsonStr(sm['status']).isEmpty
+          ? null
+          : _jsonStr(sm['status']),
     );
   }
 
@@ -1550,7 +1544,9 @@ class ExamService {
       try {
         final attemptsRaw = await _db
             .from('exam_attempts')
-            .select('student_id, completion_seconds, violation_count, started_at, submitted_at, ended_at')
+            .select(
+              'student_id, completion_seconds, violation_count, started_at, submitted_at, ended_at',
+            )
             .eq('exam_session_id', examSessionId)
             .eq('status', 'completed');
         for (final row in attemptsRaw) {
@@ -1569,8 +1565,7 @@ class ExamService {
         }
         final sid = _jsonStr(m['student_id']);
         final att = attemptByStudent[sid];
-        final completionSeconds =
-            (att?['completion_seconds'] as num?)?.toInt();
+        final completionSeconds = (att?['completion_seconds'] as num?)?.toInt();
         final violationCount =
             (att?['violation_count'] as num?)?.toInt() ??
             (m['violation_penalty'] as num?)?.toInt() ??
@@ -1579,7 +1574,7 @@ class ExamService {
         final submittedAt = tryParseDbTimestamptzToLocal(att?['submitted_at']);
         final endedAt = tryParseDbTimestamptzToLocal(att?['ended_at']);
         final finishedAt = submittedAt ?? endedAt;
-        
+
         return ExamRankingRow(
           studentId: sid,
           studentName: name,
@@ -1648,8 +1643,9 @@ class ExamService {
       for (final row in attemptsRaw) {
         final m = Map<String, dynamic>.from(row as Map<dynamic, dynamic>);
         final attemptId = _jsonStr(m['id']);
-        final status =
-            _jsonStr(m['status']).isEmpty ? 'in_progress' : _jsonStr(m['status']);
+        final status = _jsonStr(m['status']).isEmpty
+            ? 'in_progress'
+            : _jsonStr(m['status']);
         final students = m['students'];
         var studentName = 'Student';
         if (students is Map) {
@@ -1828,9 +1824,11 @@ class ExamService {
           .select('id')
           .eq('subject_offering_id', subjectOfferingId.trim());
       final sessionIds = sessionsRaw
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
       if (sessionIds.isEmpty) return;
@@ -1841,14 +1839,19 @@ class ExamService {
           .eq('student_id', studentId.trim())
           .inFilter('exam_session_id', sessionIds);
       final attemptIds = attemptsRaw
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
 
       if (attemptIds.isNotEmpty) {
-        await _db.from('exam_alerts').delete().inFilter('exam_attempt_id', attemptIds);
+        await _db
+            .from('exam_alerts')
+            .delete()
+            .inFilter('exam_attempt_id', attemptIds);
         await _db
             .from('exam_proximity_logs')
             .delete()
@@ -1907,9 +1910,11 @@ class ExamService {
           .select('id')
           .eq('exam_session_id', sid);
       final attemptIds = attemptsRaw
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
 
@@ -1928,9 +1933,11 @@ class ExamService {
           .select('id')
           .eq('exam_session_id', sid);
       final questionIds = questionsRaw
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
 
@@ -1998,13 +2005,18 @@ class ExamService {
           .select('id')
           .eq('subject_offering_id', subjectOfferingId.trim());
       final sessionIds = sessionsRaw
-          .map((r) => _jsonStr(
-                Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
-              ))
+          .map(
+            (r) => _jsonStr(
+              Map<String, dynamic>.from(r as Map<dynamic, dynamic>)['id'],
+            ),
+          )
           .where((id) => id.isNotEmpty)
           .toList();
       if (sessionIds.isEmpty) return;
-      await _db.from('exam_rankings').delete().inFilter('exam_session_id', sessionIds);
+      await _db
+          .from('exam_rankings')
+          .delete()
+          .inFilter('exam_session_id', sessionIds);
       debugPrint(
         '[ExamService] Cleared all rankings for offering $subjectOfferingId',
       );

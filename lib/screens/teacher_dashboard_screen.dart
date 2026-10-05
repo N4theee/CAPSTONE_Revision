@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../services/exam_beacon_service.dart';
 import '../ui/responsive.dart';
 import '../ui/adaptive_layout.dart';
 import '../widgets/course_dashboard_card.dart';
@@ -99,7 +100,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     ).showSnackBar(const SnackBar(content: Text('Name updated.')));
   }
 
-  void _signOut() {
+  Future<void> _signOut() async {
+    await ExamBeaconService().stop();
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const HomeScreen()),

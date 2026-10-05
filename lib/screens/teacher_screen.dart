@@ -34,6 +34,10 @@ class _TeacherScreenState extends State<TeacherScreen>
   List<Map<String, dynamic>> _attendees = [];
   List<AttendanceAnomaly> _anomalies = const [];
   Timer? _pollTimer;
+  Timer? _refreshDebounce;
+  StreamSubscription<List<Map<String, dynamic>>>? _attendanceSub;
+  bool _refreshing = false;
+  bool _refreshAgain = false;
 
   late AnimationController _radarController;
 
@@ -95,8 +99,12 @@ class _TeacherScreenState extends State<TeacherScreen>
         _active = true;
         _loading = false;
       });
+      _attendanceSub = _db.watchAttendanceRecords(_sessionId!).listen((_) {
+        _refreshDebounce?.cancel();
+        _refreshDebounce = Timer(const Duration(milliseconds: 300), _refresh);
+      }, onError: (Object e) => debugPrint('Attendance live updates: $e'));
       _pollTimer = Timer.periodic(
-        const Duration(seconds: 4),
+        const Duration(seconds: 30),
         (_) => _refresh(),
       );
       await _refresh();
@@ -109,9 +117,12 @@ class _TeacherScreenState extends State<TeacherScreen>
   Future<void> _endSession() async {
     if (_sessionId == null) return;
     setState(() => _loading = true);
-    _pollTimer?.cancel();
     try {
       await _db.endSession(_sessionId!);
+      _pollTimer?.cancel();
+      _refreshDebounce?.cancel();
+      await _attendanceSub?.cancel();
+      _attendanceSub = null;
       await _ble.stopTeacherBeacon();
       setState(() {
         _active = false;
@@ -126,13 +137,29 @@ class _TeacherScreenState extends State<TeacherScreen>
   }
 
   Future<void> _refresh() async {
-    if (_sessionId == null) return;
-    final list = await _db.getAttendees(_sessionId!);
-    if (mounted) {
-      setState(() {
-        _attendees = list;
-        _anomalies = _db.detectSharedDeviceAnomalies(list);
-      });
+    final sessionId = _sessionId;
+    if (!mounted || sessionId == null) return;
+    if (_refreshing) {
+      _refreshAgain = true;
+      return;
+    }
+    _refreshing = true;
+    try {
+      final list = await _db.getAttendees(sessionId);
+      if (mounted && _sessionId == sessionId) {
+        setState(() {
+          _attendees = list;
+          _anomalies = _db.detectSharedDeviceAnomalies(list);
+        });
+      }
+    } catch (e) {
+      debugPrint('Attendance refresh: $e');
+    } finally {
+      _refreshing = false;
+      if (_refreshAgain) {
+        _refreshAgain = false;
+        unawaited(_refresh());
+      }
     }
   }
 
@@ -206,6 +233,8 @@ class _TeacherScreenState extends State<TeacherScreen>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _refreshDebounce?.cancel();
+    _attendanceSub?.cancel();
     _radarController.dispose();
     _ble.stopTeacherBeacon();
     super.dispose();

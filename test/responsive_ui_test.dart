@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ble_attendance/services/supabase_service.dart';
+import 'package:ble_attendance/services/exam_beacon_service.dart';
 import 'package:ble_attendance/screens/auth_screen.dart';
 import 'package:ble_attendance/screens/create_exam_session_screen.dart';
 import 'package:ble_attendance/screens/exam_history_screen.dart';
@@ -105,8 +106,9 @@ void main() {
       debug: false,
     );
   });
-  tearDown(() {
+  tearDown(() async {
     failHistory = false;
+    await ExamBeaconService().stop();
   });
   tearDownAll(() async {
     await Supabase.instance.dispose();

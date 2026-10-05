@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'device_identity_service.dart';
@@ -71,20 +73,14 @@ class SubjectOffering {
 }
 
 class StudentBasic {
-  const StudentBasic({
-    required this.id,
-    required this.fullName,
-  });
+  const StudentBasic({required this.id, required this.fullName});
 
   final String id;
   final String fullName;
 }
 
 class TeacherBasic {
-  const TeacherBasic({
-    required this.id,
-    required this.fullName,
-  });
+  const TeacherBasic({required this.id, required this.fullName});
 
   final String id;
   final String fullName;
@@ -165,8 +161,7 @@ class EnrollmentRecord {
   final String subjectTitle;
   final String section;
 
-  String get label =>
-      '$studentName â†’ $subjectCode $section ($teacherName)';
+  String get label => '$studentName â†’ $subjectCode $section ($teacherName)';
 }
 
 class AdminAttendanceReportItem {
@@ -241,6 +236,45 @@ class SupabaseService {
   SupabaseService._();
 
   final _db = Supabase.instance.client;
+  int attendanceScreenCount = 0;
+  final _pollRandom = Random();
+
+  /// Left embedding preserves the active session even when no attendance exists.
+  /// Excludes a previously confirmed record but still detects new sessions.
+  Future<Map<String, dynamic>?> getStudentOfferingSession({
+    required String offeringId,
+    required String studentId,
+    String? confirmedSessionId,
+  }) async {
+    var query = _db
+        .from('attendance_sessions')
+        .select(
+          'id, started_at, beacon_uuid, beacon_name, rssi_threshold, '
+          'attendance_records(id, student_id)',
+        )
+        .eq('subject_offering_id', offeringId)
+        .eq('is_active', true)
+        .eq('attendance_records.student_id', studentId);
+    if (confirmedSessionId != null) {
+      query = query.neq(
+        'attendance_records.attendance_session_id',
+        confirmedSessionId,
+      );
+    }
+    final rows = await query.order('started_at', ascending: false).limit(1);
+    if (rows.isEmpty) return null;
+    final row = Map<String, dynamic>.from(rows.first);
+    row['already_marked'] =
+        row['id'] == confirmedSessionId ||
+        (row['attendance_records'] as List).isNotEmpty;
+    return row;
+  }
+
+  Stream<List<Map<String, dynamic>>> watchAttendanceRecords(String sessionId) =>
+      _db
+          .from('attendance_records')
+          .stream(primaryKey: ['id'])
+          .eq('attendance_session_id', sessionId);
 
   // â”€â”€ AUTH + ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -378,10 +412,7 @@ class SupabaseService {
       return result as String;
     } on PostgrestException catch (e) {
       if (e.code != 'PGRST202') rethrow;
-      final result = await _db.rpc(
-        'register_student',
-        params: baseParams,
-      );
+      final result = await _db.rpc('register_student', params: baseParams);
       return result as String;
     }
   }
@@ -392,10 +423,12 @@ class SupabaseService {
         .select('id, full_name, student_number')
         .order('full_name');
     return rows
-        .map((e) => StudentBasic(
-              id: e['id'] as String,
-              fullName: e['full_name'] as String,
-            ))
+        .map(
+          (e) => StudentBasic(
+            id: e['id'] as String,
+            fullName: e['full_name'] as String,
+          ),
+        )
         .toList();
   }
 
@@ -413,14 +446,17 @@ class SupabaseService {
   }
 
   Future<List<TeacherBasic>> getAllTeachers() async {
-    final rows = await _db.from('teachers').select('id, full_name').order(
-          'full_name',
-        );
+    final rows = await _db
+        .from('teachers')
+        .select('id, full_name')
+        .order('full_name');
     return rows
-        .map((e) => TeacherBasic(
-              id: e['id'] as String,
-              fullName: e['full_name'] as String,
-            ))
+        .map(
+          (e) => TeacherBasic(
+            id: e['id'] as String,
+            fullName: e['full_name'] as String,
+          ),
+        )
         .toList();
   }
 
@@ -494,10 +530,7 @@ class SupabaseService {
   }) async {
     await _db.rpc(
       'admin_assign_student_to_offering',
-      params: {
-        'p_student_id': studentId.trim(),
-        'p_offering_id': offeringId,
-      },
+      params: {'p_student_id': studentId.trim(), 'p_offering_id': offeringId},
     );
   }
 
@@ -600,12 +633,14 @@ class SupabaseService {
         .toList();
   }
 
-  Future<List<Map<String, dynamic>>> getEnrolledStudents(String offeringId) async {
+  Future<List<Map<String, dynamic>>> getEnrolledStudents(
+    String offeringId,
+  ) async {
     final rows = await _db
         .from('student_subject_enrollments')
         .select('students(id, full_name, student_number)')
         .eq('subject_offering_id', offeringId);
-    
+
     return rows.map((e) {
       final s = (e['students'] as Map<String, dynamic>?) ?? {};
       return {
@@ -667,7 +702,8 @@ class SupabaseService {
 
   /// Enrollment counts per offering (for dashboard cards).
   Future<Map<String, int>> getEnrollmentCountsForOfferings(
-      List<String> offeringIds) async {
+    List<String> offeringIds,
+  ) async {
     if (offeringIds.isEmpty) return {};
     final rows = await _db
         .from('student_subject_enrollments')
@@ -826,17 +862,18 @@ class SupabaseService {
   }
 
   Future<void> endSession(String sessionId) async {
-    await _db.from('attendance_sessions').update({
-      'is_active': false,
-      'ended_at': utcIsoNowForDb(),
-    }).eq('id', sessionId);
+    await _db
+        .from('attendance_sessions')
+        .update({'is_active': false, 'ended_at': utcIsoNowForDb()})
+        .eq('id', sessionId);
     debugPrint('[DB] Session ended: $sessionId');
   }
 
   // â”€â”€ STUDENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<Map<String, dynamic>?> getActiveSessionForOffering(
-      String offeringId) async {
+    String offeringId,
+  ) async {
     List<Map<String, dynamic>> result;
     try {
       result = await _db
@@ -949,11 +986,12 @@ class SupabaseService {
 
       final studentName =
           ((row['student_name'] as String?)?.trim().isNotEmpty ?? false)
-              ? (row['student_name'] as String).trim()
-              : ((row['student_id'] as String?) ?? 'Unknown student');
+          ? (row['student_name'] as String).trim()
+          : ((row['student_id'] as String?) ?? 'Unknown student');
       final deviceName = (row['device_name'] as String?)?.trim();
-      final displayName =
-          (deviceName != null && deviceName.isNotEmpty) ? deviceName : 'Unknown device';
+      final displayName = (deviceName != null && deviceName.isNotEmpty)
+          ? deviceName
+          : 'Unknown device';
       final label = displayName;
 
       buckets.putIfAbsent(deviceUuid, () => <String>{}).add(studentName);
@@ -1013,7 +1051,12 @@ class SupabaseService {
       final emitted = <String>{};
 
       Future<void> poll() async {
-        if (controller.isClosed) return;
+        if (controller.isClosed ||
+            attendanceScreenCount > 0 ||
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed) {
+          return;
+        }
         try {
           final raw = await _db
               .from('attendance_sessions')
@@ -1064,10 +1107,14 @@ class SupabaseService {
         }
       }
 
-      await poll();
-      timer = Timer.periodic(const Duration(seconds: 4), (_) {
-        unawaited(poll());
-      });
+      Future<void> tick() async {
+        await poll();
+        if (!controller.isClosed) {
+          timer = Timer(Duration(seconds: 10 + _pollRandom.nextInt(6)), tick);
+        }
+      }
+
+      await tick();
     }
 
     unawaited(start());
@@ -1086,8 +1133,8 @@ class SupabaseService {
     return rows.map((row) {
       final map = row as Map<String, dynamic>;
       final endedRaw = map['ended_at'];
-      final endedAt = (endedRaw == null ||
-              (endedRaw is String && endedRaw.trim().isEmpty))
+      final endedAt =
+          (endedRaw == null || (endedRaw is String && endedRaw.trim().isEmpty))
           ? null
           : parseDbTimestamptzToLocal(endedRaw);
       return TeacherSessionHistoryItem(
@@ -1109,24 +1156,20 @@ class SupabaseService {
     try {
       final rows = await _db.rpc(
         'get_teacher_session_attendees',
-        params: {
-          'p_teacher_id': teacherId.trim(),
-          'p_session_id': sessionId,
-        },
+        params: {'p_teacher_id': teacherId.trim(), 'p_session_id': sessionId},
       );
       if (rows is! List) return [];
 
       return rows.map((row) {
         final map = row as Map<String, dynamic>;
-        final isPresent = (map['is_present'] as bool?) ??
-            (map['marked_at'] != null);
+        final isPresent =
+            (map['is_present'] as bool?) ?? (map['marked_at'] != null);
         final markedRaw = map['marked_at'];
         final markedAt = markedRaw == null
             ? null
             : parseDbTimestamptzToLocal(markedRaw);
         final deviceRaw = map['device_used'];
-        final deviceStr =
-            deviceRaw == null ? '' : _jsonStr(deviceRaw);
+        final deviceStr = deviceRaw == null ? '' : _jsonStr(deviceRaw);
         return SessionAttendanceDetailItem(
           studentId: _jsonStr(map['student_id']),
           studentName: _jsonStr(map['student_name']).isEmpty
@@ -1204,10 +1247,10 @@ class SupabaseService {
           final deviceUsed = (deviceName != null && deviceName.isNotEmpty)
               ? deviceName
               : (hasUuid
-                  ? 'Registered handset'
-                  : ((fp != null && fp.isNotEmpty)
-                      ? 'Registered device'
-                      : 'Unknown device'));
+                    ? 'Registered handset'
+                    : ((fp != null && fp.isNotEmpty)
+                          ? 'Registered device'
+                          : 'Unknown device'));
           out.add(
             SessionAttendanceDetailItem(
               studentId: stuId,
@@ -1220,9 +1263,8 @@ class SupabaseService {
         }
       }
       out.sort(
-        (a, b) => a.studentName.toLowerCase().compareTo(
-              b.studentName.toLowerCase(),
-            ),
+        (a, b) =>
+            a.studentName.toLowerCase().compareTo(b.studentName.toLowerCase()),
       );
       return out;
     }
@@ -1271,31 +1313,25 @@ class SupabaseService {
     }
 
     try {
-      await _db.from('attendance_records').upsert(
-        {
+      await _db.from('attendance_records').upsert({
+        'attendance_session_id': sessId,
+        'student_id': stuId,
+        'student_device_id': null,
+        'status': 'Present',
+        'marked_at': utcIsoNowForDb(),
+        'device_name': 'Manual (teacher)',
+      }, onConflict: 'attendance_session_id,student_id');
+    } on PostgrestException catch (e) {
+      if (e.code == 'PGRST204' &&
+          (e.message.contains('device_name') ||
+              e.message.contains('onConflict'))) {
+        await _db.from('attendance_records').upsert({
           'attendance_session_id': sessId,
           'student_id': stuId,
           'student_device_id': null,
           'status': 'Present',
           'marked_at': utcIsoNowForDb(),
-          'device_name': 'Manual (teacher)',
-        },
-        onConflict: 'attendance_session_id,student_id',
-      );
-    } on PostgrestException catch (e) {
-      if (e.code == 'PGRST204' &&
-          (e.message.contains('device_name') ||
-              e.message.contains('onConflict'))) {
-        await _db.from('attendance_records').upsert(
-          {
-            'attendance_session_id': sessId,
-            'student_id': stuId,
-            'student_device_id': null,
-            'status': 'Present',
-            'marked_at': utcIsoNowForDb(),
-          },
-          onConflict: 'attendance_session_id,student_id',
-        );
+        }, onConflict: 'attendance_session_id,student_id');
         return;
       }
       rethrow;
@@ -1318,10 +1354,18 @@ class SupabaseService {
       final idsRaw = map['student_ids'];
 
       final names = namesRaw is List
-          ? namesRaw.whereType<String>().map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+          ? namesRaw
+                .whereType<String>()
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
           : <String>[];
       final ids = idsRaw is List
-          ? idsRaw.whereType<String>().map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+          ? idsRaw
+                .whereType<String>()
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
           : <String>[];
       // Prefer real names; never show raw student UUIDs in the UI.
       final students = names.isNotEmpty
@@ -1355,10 +1399,7 @@ class SupabaseService {
   Future<void> clearTeacherHistory(String teacherId) async {
     final id = teacherId.trim();
     try {
-      await _db.rpc(
-        'clear_teacher_history',
-        params: {'p_teacher_id': id},
-      );
+      await _db.rpc('clear_teacher_history', params: {'p_teacher_id': id});
       return;
     } on PostgrestException catch (e) {
       if (e.code != 'PGRST202') rethrow;
@@ -1435,8 +1476,9 @@ class SupabaseService {
         subjectTitle: (map['subject_title'] as String?) ?? 'Untitled',
         section: (map['section'] as String?) ?? 'N/A',
         teacherName: (map['teacher_name'] as String?) ?? 'Teacher',
-        sessionStartedAt:
-            parseDbTimestamptzToLocal(map['session_started_at'] as String),
+        sessionStartedAt: parseDbTimestamptzToLocal(
+          map['session_started_at'] as String,
+        ),
         markedAt: parseDbTimestamptzToLocal(map['marked_at'] as String),
       );
     }).toList();
@@ -1445,10 +1487,7 @@ class SupabaseService {
   Future<void> clearStudentHistory(String studentId) async {
     final id = studentId.trim();
     try {
-      await _db.rpc(
-        'clear_student_history',
-        params: {'p_student_id': id},
-      );
+      await _db.rpc('clear_student_history', params: {'p_student_id': id});
       return;
     } on PostgrestException catch (e) {
       if (e.code != 'PGRST202') rethrow;

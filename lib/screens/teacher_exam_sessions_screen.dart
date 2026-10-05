@@ -2,6 +2,7 @@ import '../ui/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../services/exam_beacon_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
 import '../ui/teacher_attendance_ui.dart';
@@ -47,6 +48,13 @@ class _TeacherExamSessionsScreenState extends State<TeacherExamSessionsScreen> {
       final session = await _exam.getActiveExamSessionForOffering(
         widget.offering.id,
       );
+      if (session != null && (session.isActive || session.isPaused)) {
+        try {
+          await ExamBeaconService().ensure(session, widget.offering);
+        } catch (e) {
+          if (mounted) _toast('Exam Bluetooth is not ready: $e');
+        }
+      }
       if (!mounted) return;
       setState(() {
         _activeOrScheduled = session;

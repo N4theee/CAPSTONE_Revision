@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config.dart';
-import '../services/ble_service.dart';
+import '../services/exam_beacon_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
@@ -31,7 +31,7 @@ class TeacherExamActiveScreen extends StatefulWidget {
 
 class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
   final _exam = ExamService();
-  final _ble = BleService();
+  final _beacon = ExamBeaconService();
 
   late ExamSession _session;
   bool _beaconOn = false;
@@ -41,6 +41,9 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
   void initState() {
     super.initState();
     _session = widget.session;
+    _beacon.ready.addListener(_beaconChanged);
+    _beacon.error.addListener(_beaconChanged);
+    _beaconChanged();
     if (_session.isActive || _session.isPaused) {
       unawaited(_ensureBeacon());
     }
@@ -48,50 +51,35 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
 
   @override
   void dispose() {
-    unawaited(_ble.stopExamBeaconAdvertising());
+    _beacon.ready.removeListener(_beaconChanged);
+    _beacon.error.removeListener(_beaconChanged);
     super.dispose();
   }
 
+  void _beaconChanged() {
+    if (mounted) setState(() => _beaconOn = _beacon.isReadyFor(_session.id));
+  }
+
+  String get _beaconUuid => ExamService.resolveBeaconUuid(
+    session: _session,
+    offeringBeaconUuid: widget.offering.beaconUuid,
+  );
+
   String _beaconAdvertisedName() {
-    final configured = widget.offering.beaconName.trim();
-    if (configured.isNotEmpty) return configured;
-    final code = widget.offering.subjectCode.trim();
-    if (code.isNotEmpty) return code;
+    if (widget.offering.beaconName.trim().isNotEmpty) {
+      return widget.offering.beaconName.trim();
+    }
+    if (widget.offering.subjectCode.trim().isNotEmpty) {
+      return widget.offering.subjectCode.trim();
+    }
     return AppConfig.defaultBeaconName;
   }
 
-  String get _beaconUuid {
-    return ExamService.resolveBeaconUuid(
-      session: _session,
-      offeringBeaconUuid: widget.offering.beaconUuid,
-    );
-  }
-
   Future<void> _ensureBeacon() async {
-    final uuid = _beaconUuid;
-    if (uuid.isEmpty) {
-      if (mounted) setState(() => _beaconOn = false);
-      return;
-    }
     try {
-      final permissionIssue = await _ble.examBlePermissionIssue();
-      if (permissionIssue != null) {
-        debugPrint('[exam] beacon permissions: $permissionIssue');
-        if (mounted) setState(() => _beaconOn = false);
-        return;
-      }
-      if (!await _ble.isBluetoothOn()) {
-        if (mounted) setState(() => _beaconOn = false);
-        return;
-      }
-      await _ble.startExamBeaconAdvertising(
-        bleUuid: uuid,
-        beaconName: _beaconAdvertisedName(),
-      );
-      if (mounted) setState(() => _beaconOn = true);
+      await _beacon.ensure(_session, widget.offering);
     } catch (e) {
-      debugPrint('[exam] teacher beacon: $e');
-      if (mounted) setState(() => _beaconOn = false);
+      if (mounted) _toast('Students cannot join yet: $e');
     }
   }
 
@@ -151,12 +139,17 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
   Future<void> _startExamNow() async {
     setState(() => _busy = true);
     try {
-      await _exam.activateExamSession(_session.id);
+      await _beacon.ensure(_session, widget.offering);
+      try {
+        await _exam.activateExamSession(_session.id);
+      } catch (_) {
+        await _beacon.stop(sessionId: _session.id);
+        rethrow;
+      }
       await _reloadSession();
-      await _ensureBeacon();
       _toast('Exam is now active. Share the code with students.');
-    } on ExamServiceException catch (e) {
-      _toast(e.message);
+    } catch (e) {
+      if (mounted) _toast('Could not start exam: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -317,6 +310,16 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    if (_beacon.error.value != null && !isTerminal)
+                      Text(
+                        _beacon.error.value!,
+                        style: const TextStyle(color: Colors.orange),
+                      ),
+                    if (!_beaconOn && (_session.isActive || _session.isPaused))
+                      OutlinedButton(
+                        onPressed: _ensureBeacon,
+                        child: const Text('Retry Bluetooth'),
+                      ),
                     _DetailRow(label: 'Status', value: _session.status),
                     _DetailRow(label: 'Starts', value: _fmt(_session.startsAt)),
                     _DetailRow(label: 'Ends', value: _fmt(_session.endsAt)),
@@ -380,12 +383,13 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                         onPressed: () async {
                           setState(() => _busy = true);
                           try {
+                            await _beacon.ensure(_session, widget.offering);
                             await _exam.resumeExamSession(_session.id);
                             await _reloadSession();
                             await _ensureBeacon();
                             _toast('Exam resumed.');
-                          } on ExamServiceException catch (e) {
-                            _toast(e.message);
+                          } catch (e) {
+                            if (mounted) _toast('Could not resume exam: $e');
                           } finally {
                             if (mounted) setState(() => _busy = false);
                           }
@@ -411,7 +415,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                           confirmLabel: 'End exam',
                           action: () async {
                             await _exam.endExamSession(_session.id);
-                            await _ble.stopExamBeaconAdvertising();
+                            await _beacon.stop(sessionId: _session.id);
                             if (mounted) setState(() => _beaconOn = false);
                           },
                         ),
@@ -430,7 +434,7 @@ class _TeacherExamActiveScreenState extends State<TeacherExamActiveScreen> {
                           confirmLabel: 'Cancel exam',
                           action: () async {
                             await _exam.cancelExamSession(_session.id);
-                            await _ble.stopExamBeaconAdvertising();
+                            await _beacon.stop(sessionId: _session.id);
                             if (mounted) setState(() => _beaconOn = false);
                           },
                         ),

@@ -79,20 +79,26 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
   }
 
   Future<void> _ensureEnrollmentAndAttemptRules(ExamSession session) async {
-    final enrolled = await _exam.isStudentEnrolledInOffering(
+    final enrollmentFuture = _exam.isStudentEnrolledInOffering(
       widget.studentId,
       widget.offering.id,
     );
+    final attemptFuture = _exam.getStudentExamAttempt(
+      examSessionId: session.id,
+      studentId: widget.studentId,
+    );
+    final checks = await Future.wait<dynamic>([
+      enrollmentFuture,
+      attemptFuture,
+    ]);
+    final enrolled = checks[0] as bool;
     if (!enrolled) {
       throw ExamServiceException(
         'You are not enrolled in this subject offering.',
       );
     }
 
-    final attempt = await _exam.getStudentExamAttempt(
-      examSessionId: session.id,
-      studentId: widget.studentId,
-    );
+    final attempt = checks[1] as ExamAttempt?;
     if (attempt != null && attempt.isTerminal) {
       throw ExamServiceException(
         'You already finished this exam (${attempt.status}).',
@@ -154,26 +160,6 @@ class _JoinExamScreenState extends State<JoinExamScreen> {
   }
 
   Future<void> proceedToExam(ExamSession session) async {
-    final existing = await _exam.getStudentExamAttempt(
-      examSessionId: session.id,
-      studentId: widget.studentId,
-    );
-    if (existing != null && existing.status == 'in_progress') {
-      final liveSession = await _exam.getExamSessionById(session.id);
-      if (liveSession != null && liveSession.isTerminal) {
-        throw ExamServiceException(
-          'This exam session has ended. See Exam History for your record.',
-        );
-      }
-      if (!mounted) return;
-      setState(() {
-        _loadState = _JoinLoadState.proximityPassed;
-        _statusLine = null;
-      });
-      _navigateToMonitor(session: liveSession ?? session, attempt: existing);
-      return;
-    }
-
     final attempt = await _exam.createExamAttempt(
       examSessionId: session.id,
       studentId: widget.studentId,

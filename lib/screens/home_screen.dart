@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openAdminLogin() async {
     final themed = LandingAuthUi.authThemeOverlay(Theme.of(context));
-    final ok = await showModalBottomSheet<bool>(
+    final admin = await showModalBottomSheet<AppUser>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -181,7 +181,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       role: 'admin',
                     );
                     if (!ctx.mounted) return;
-                    Navigator.pop(ctx, user != null && user.role == 'admin');
+                    Navigator.pop(
+                      ctx,
+                      user != null && user.role == 'admin' ? user : null,
+                    );
                   } catch (e) {
                     if (!ctx.mounted) return;
                     final msg = networkErrorMessage(e);
@@ -190,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ctx,
                       ).showSnackBar(SnackBar(content: Text(msg)));
                     } else {
-                      Navigator.pop(ctx, false);
+                      Navigator.pop(ctx);
                     }
                   }
                 },
@@ -203,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
-    if (ok != true) {
+    if (admin == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid admin credentials.')),
       );
@@ -211,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AdminWebPanelScreen()),
+      MaterialPageRoute(builder: (_) => AdminWebPanelScreen(user: admin)),
     );
   }
 }

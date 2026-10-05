@@ -1,5 +1,6 @@
 import '../ui/adaptive_layout.dart';
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -52,6 +53,9 @@ class _StudentScreenState extends State<StudentScreen>
   Map<String, int> _nearbyDevices = {};
   bool _scanningNearby = false;
 
+  bool _checkingSession = false;
+  bool _foreground = true;
+  final _pollRandom = Random();
   Timer? _sessionPollTimer;
   Timer? _uiClockTimer;
 
@@ -61,6 +65,7 @@ class _StudentScreenState extends State<StudentScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _db.attendanceScreenCount++;
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -70,22 +75,39 @@ class _StudentScreenState extends State<StudentScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        _sessionActive &&
-        _beaconUuid != null) {
-      _ble.startProximityScanning(
-        _beaconUuid!,
-        beaconName: _beaconAdvertisedName ?? AppConfig.defaultBeaconName,
-        rssiThreshold: _sessionRssiThreshold,
-      );
-    }
-    if (state == AppLifecycleState.paused) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) {
+      unawaited(_checkSession().whenComplete(_scheduleSessionPoll));
+      if (_sessionActive && _beaconUuid != null) {
+        unawaited(
+          _ble.startProximityScanning(
+            _beaconUuid!,
+            beaconName: _beaconAdvertisedName ?? AppConfig.defaultBeaconName,
+            rssiThreshold: _sessionRssiThreshold,
+          ),
+        );
+      }
+    } else {
+      _sessionPollTimer?.cancel();
       _ble.stopProximityScanning();
     }
   }
 
+  void _scheduleSessionPoll() {
+    _sessionPollTimer?.cancel();
+    if (!mounted || !_foreground || !_bleGranted) return;
+    _sessionPollTimer = Timer(
+      Duration(seconds: 10 + _pollRandom.nextInt(6)),
+      () async {
+        await _checkSession();
+        _scheduleSessionPoll();
+      },
+    );
+  }
+
   Future<void> _init() async {
     final granted = await _ble.requestPermissions();
+    if (!mounted) return;
     setState(() => _bleGranted = granted);
 
     if (!granted) {
@@ -97,12 +119,8 @@ class _StudentScreenState extends State<StudentScreen>
       if (mounted) setState(() => _inRange = inRange);
     });
 
-    _sessionPollTimer = Timer.periodic(
-      const Duration(seconds: 4),
-      (_) => _checkSession(),
-    );
-
     await _checkSession();
+    _scheduleSessionPoll();
   }
 
   void _syncUiClock() {
@@ -115,10 +133,15 @@ class _StudentScreenState extends State<StudentScreen>
   }
 
   Future<void> _checkSession() async {
+    if (_checkingSession || !mounted || !_foreground) return;
+    _checkingSession = true;
     try {
-      final sessionForTeacher = await _db.getActiveSessionForOffering(
-        widget.offering.id,
+      final sessionForTeacher = await _db.getStudentOfferingSession(
+        offeringId: widget.offering.id,
+        studentId: widget.studentId,
+        confirmedSessionId: _attended ? _sessionId : null,
       );
+      if (!mounted || !_foreground) return;
 
       if (sessionForTeacher != null) {
         final newId = sessionForTeacher['id'] as String;
@@ -153,6 +176,7 @@ class _StudentScreenState extends State<StudentScreen>
             _beaconAdvertisedName = newBeaconName;
             _sessionRssiThreshold = parsedRssi;
             _sessionActive = true;
+            _inRange = false;
             _attended = false;
             _sessionStartedAt = started;
           });
@@ -163,15 +187,15 @@ class _StudentScreenState extends State<StudentScreen>
             beaconName: newBeaconName ?? AppConfig.defaultBeaconName,
             rssiThreshold: parsedRssi,
           );
+          if (!mounted || !_foreground) return;
         } else if (mounted && _sessionStartedAt == null && started != null) {
           setState(() => _sessionStartedAt = started);
           _syncUiClock();
         }
 
-        final alreadyMarked = await _db.hasStudentMarkedAttendance(
-          sessionId: newId,
-          studentId: widget.studentId,
-        );
+        final alreadyMarked =
+            sessionForTeacher['already_marked'] == true ||
+            (_sessionId == newId && _attended);
         if (mounted && _attended != alreadyMarked) {
           setState(() => _attended = alreadyMarked);
         }
@@ -192,6 +216,8 @@ class _StudentScreenState extends State<StudentScreen>
       }
     } catch (e) {
       debugPrint('Session error: $e');
+    } finally {
+      _checkingSession = false;
     }
   }
 
@@ -212,26 +238,35 @@ class _StudentScreenState extends State<StudentScreen>
   }
 
   Future<void> _markAttendance() async {
-    if (!_inRange || !_sessionActive || _attended || _sessionId == null) return;
+    if (_loading ||
+        !_inRange ||
+        !_sessionActive ||
+        _attended ||
+        _sessionId == null) {
+      return;
+    }
 
     setState(() => _loading = true);
+    final submittedSessionId = _sessionId!;
 
     try {
       final identity = await _identity.getDeviceIdentity();
       final ok = await _db.markAttendanceSecure(
-        sessionId: _sessionId!,
+        sessionId: submittedSessionId,
         studentId: widget.studentId,
         studentName: widget.studentName,
         identity: identity,
       );
 
+      if (!mounted) return;
       setState(() {
-        _attended = ok ? true : _attended;
+        if (_sessionId == submittedSessionId) _attended = true;
         _loading = false;
       });
 
       _toast(ok ? 'Attendance marked!' : 'Attendance already marked');
     } on PostgrestException catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
       final msg = e.message;
       if (msg.contains('Attendance blocked') ||
@@ -245,6 +280,7 @@ class _StudentScreenState extends State<StudentScreen>
         _toast('Error: $msg');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
       _toast('Error: $e');
     }
@@ -345,6 +381,7 @@ class _StudentScreenState extends State<StudentScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _db.attendanceScreenCount--;
     _sessionPollTimer?.cancel();
     _uiClockTimer?.cancel();
     _proximitySub?.cancel();

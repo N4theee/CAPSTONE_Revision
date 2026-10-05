@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -78,5 +79,5 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     tester.view.resetViewInsets();
     await tester.binding.setSurfaceSize(null);
-  });
+  }, skip: !kIsWeb);
 }

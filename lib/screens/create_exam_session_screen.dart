@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config.dart';
+import '../services/exam_beacon_service.dart';
 import '../services/supabase_service.dart';
 import '../ui/exam_ui.dart';
 import '../ui/responsive.dart';
@@ -172,14 +173,29 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
         rssiThreshold: rssi,
         gracePeriodSeconds: grace,
         durationMinutes: duration,
-        status: status,
+        status: 'scheduled',
         startsAt: _useSchedule ? _startsAt : null,
         endsAt: _endsAt,
         questions: _questions,
       );
+      String? readinessError;
+      if (status == 'active') {
+        try {
+          await ExamBeaconService().ensure(session, widget.offering);
+          await _exam.activateExamSession(session.id);
+        } catch (e) {
+          await ExamBeaconService().stop(sessionId: session.id);
+          readinessError =
+              'Exam saved but not started: $e. Open Exam Active to retry.';
+        }
+      }
       if (!mounted) return;
       setState(() => _saving = false);
-      await _showCreatedDialog(session.examCode);
+      await _showCreatedDialog(
+        session.examCode,
+        readinessError: readinessError,
+        scheduled: status == 'scheduled',
+      );
       if (!mounted) return;
       Navigator.pop(context, true);
     } on ExamServiceException catch (e) {
@@ -193,7 +209,11 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
     }
   }
 
-  Future<void> _showCreatedDialog(String examCode) async {
+  Future<void> _showCreatedDialog(
+    String examCode, {
+    String? readinessError,
+    bool scheduled = false,
+  }) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -207,8 +227,11 @@ class _CreateExamSessionScreenState extends State<CreateExamSessionScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Share this code with students:',
+            Text(
+              readinessError ??
+                  (scheduled
+                      ? 'Exam saved. Open Exam Active to start it at the scheduled time.'
+                      : 'Bluetooth is ready. Share this code with students:'),
               style: TextStyle(color: TeacherAttendanceUi.textSecondary),
             ),
             const SizedBox(height: 12),
