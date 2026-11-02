@@ -1,5 +1,9 @@
 # ProXamity admin panel
 
+Device Management now provides password-confirmed student-device resets and
+phone reassignment with required reasons and protected reset history. Apply the
+additive migration and follow `docs/device_management.md` before use.
+
 The existing Admin Panel login opens the new dashboard. Wide screens show a
 collapsible sidebar; narrow screens use a navigation drawer.
 
@@ -77,3 +81,5 @@ been performed, so they do not establish a guaranteed simultaneous-user limit.
 Enrollments now opens a section directory with capacity, curriculum, teacher assignments and fixed annual student placement. Open a section to view Students or Subjects & Teachers. Question Bank opens an exam directory; selecting an exam loads only its questions in question order. Teacher, subject, exam, and date filters apply to the exam directory.
 
 The new fixed-section enrollment workflow and database setup are documented in `docs/section_enrollment.md`. The older subject-grouped enrollment directory is replaced by section placement; Class Sections remains available for legacy record review.
+
+Class Sections is a read-only directory with section-name search across database pages, student rosters and semester subject/teacher details. Section creation, curricula, teacher assignments and enrollment changes remain under Enrollments. Exams provides a per-exam Delete action with confirmation; deletion permanently removes its questions, answers, attempts, rankings and monitoring records.

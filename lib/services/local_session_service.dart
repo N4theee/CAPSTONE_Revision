@@ -13,9 +13,12 @@ class LocalSessionService {
   factory LocalSessionService() => _i;
 
   static const _payloadKey = 'local_student_session_v1';
+  int _revision = 0;
+  int get revision => _revision;
 
   Future<void> saveUserSession(AppUser user, DeviceIdentity identity) async {
     if (user.role != 'student') return;
+    _revision++;
     final prefs = await SharedPreferences.getInstance();
     final map = {
       'role': user.role,
@@ -57,6 +60,7 @@ class LocalSessionService {
   }
 
   Future<void> clearUserSession() async {
+    _revision++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_payloadKey);
   }
@@ -68,10 +72,7 @@ class LocalSessionService {
 }
 
 class SavedStudentSession {
-  const SavedStudentSession({
-    required this.user,
-    required this.deviceUuid,
-  });
+  const SavedStudentSession({required this.user, required this.deviceUuid});
 
   final AppUser user;
   final String deviceUuid;

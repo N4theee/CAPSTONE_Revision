@@ -8,6 +8,7 @@ import 'admin_operations_panel.dart';
 import 'admin_record_picker.dart';
 import 'admin_class_form.dart';
 import 'admin_section_enrollment.dart';
+import 'admin_device_management.dart';
 import 'home_screen.dart';
 
 class AdminWebPanelScreen extends StatefulWidget {
@@ -36,6 +37,7 @@ const _nav = <(String, String, IconData, String)>[
   ('students', 'Students', Icons.people_outline, 'User Management'),
   ('teachers', 'Teachers', Icons.person_outline, 'User Management'),
   ('admins', 'Admins', Icons.admin_panel_settings_outlined, 'User Management'),
+  ('devices', 'Device Management', Icons.phonelink_setup, 'User Management'),
   ('subjects', 'Subjects', Icons.menu_book_outlined, 'Academic Management'),
   ('classes', 'Class Sections', Icons.grid_view_rounded, 'Academic Management'),
   (
@@ -347,7 +349,8 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
           _summary = summary;
           _chartError = chartError;
         });
-      } else if (_selected == 'enrollments' ||
+      } else if (_selected == 'devices' ||
+          _selected == 'enrollments' ||
           (_selected == 'classes' && !_showLegacyClasses)) {
         // Section enrollment owns its independently scoped directory queries.
       } else if (kind != 'settings') {
@@ -401,105 +404,113 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
     }
   }
 
-  Widget _sidebar({bool compact = false, bool drawer = false}) => Container(
+  Widget _sidebar({bool compact = false, bool drawer = false}) => SizedBox(
     width: compact ? 80 : 242,
-    color: const Color(0xFF121A30),
-    child: SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/branding/app-logo.png',
-                  width: 36,
-                  height: 45,
-                ),
-                if (!compact) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Admin Panel',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w700,
+    child: Material(
+      color: const Color(0xFF121A30),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/branding/app-logo.png',
+                    width: 36,
+                    height: 45,
+                  ),
+                  if (!compact) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Admin Panel',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          _school.text,
-                          style: const TextStyle(color: _muted, fontSize: 11),
-                        ),
-                      ],
+                          const SizedBox(height: 5),
+                          Text(
+                            _school.text,
+                            style: const TextStyle(color: _muted, fontSize: 11),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              key: const ValueKey('admin-navigation'),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              children: [
-                for (var i = 0; i < _nav.length; i++) ...[
-                  if (!compact &&
-                      _nav[i].$4.isNotEmpty &&
-                      (i == 0 || _nav[i].$4 != _nav[i - 1].$4))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 22, 0, 8),
-                      child: Text(
-                        _nav[i].$4,
-                        style: const TextStyle(color: _muted, fontSize: 12),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView(
+                key: const ValueKey('admin-navigation'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                children: [
+                  for (var i = 0; i < _nav.length; i++) ...[
+                    if (!compact &&
+                        _nav[i].$4.isNotEmpty &&
+                        (i == 0 || _nav[i].$4 != _nav[i - 1].$4))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 22, 0, 8),
+                        child: Text(
+                          _nav[i].$4,
+                          style: const TextStyle(color: _muted, fontSize: 12),
+                        ),
+                      ),
+                    Tooltip(
+                      message: _nav[i].$2,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 2),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          gradient: _selected == _nav[i].$1
+                              ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF7E3CF5),
+                                    Color(0xFF47318C),
+                                  ],
+                                )
+                              : null,
+                        ),
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: compact ? 13 : 12,
+                          ),
+                          leading: Icon(
+                            _nav[i].$3,
+                            size: 21,
+                            color: _selected == _nav[i].$1
+                                ? Colors.white
+                                : _muted,
+                          ),
+                          title: compact
+                              ? null
+                              : Text(
+                                  _nav[i].$2,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                          onTap: () {
+                            if (drawer) Navigator.pop(context);
+                            _navigate(_nav[i].$1);
+                          },
+                        ),
                       ),
                     ),
-                  Tooltip(
-                    message: _nav[i].$2,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        gradient: _selected == _nav[i].$1
-                            ? const LinearGradient(
-                                colors: [Color(0xFF7E3CF5), Color(0xFF47318C)],
-                              )
-                            : null,
-                      ),
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: compact ? 13 : 12,
-                        ),
-                        leading: Icon(
-                          _nav[i].$3,
-                          size: 21,
-                          color: _selected == _nav[i].$1
-                              ? Colors.white
-                              : _muted,
-                        ),
-                        title: compact
-                            ? null
-                            : Text(
-                                _nav[i].$2,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                        onTap: () {
-                          if (drawer) Navigator.pop(context);
-                          _navigate(_nav[i].$1);
-                        },
-                      ),
-                    ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -677,10 +688,15 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                           _settings()
                         else if (_selected == 'activity')
                           _activity()
+                        else if (_selected == 'devices')
+                          AdminDeviceManagement(
+                            adminUsername: widget.user?.username ?? '',
+                          )
                         else if (_selected == 'enrollments' ||
                             (_selected == 'classes' && !_showLegacyClasses))
                           AdminSectionEnrollment(
                             key: ValueKey(_selected),
+                            readOnly: _selected == 'classes',
                             onLegacyClasses: () {
                               setState(() {
                                 _selected = 'classes';
@@ -1574,13 +1590,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                       icon: const Icon(Icons.person_add_alt),
                       label: const Text('Create Teacher'),
                     ),
-                  if (kind == 'subjects')
-                    FilledButton.icon(
-                      onPressed: () => _editSubject(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create Subject'),
-                    ),
-                  if (kind == 'classes' && _selected != 'enrollments')
+                  if (kind == 'classes' &&
+                      _selected != 'enrollments' &&
+                      _selected != 'classes')
                     FilledButton.icon(
                       onPressed: () => _operation(1),
                       icon: const Icon(Icons.add),
@@ -1692,12 +1704,24 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                                       ),
                                     ),
                                   if (kind == 'classes' &&
-                                      _selected != 'enrollments')
+                                      _selected != 'enrollments' &&
+                                      _selected != 'classes')
                                     IconButton(
                                       tooltip: 'Edit class',
                                       onPressed: () => _editClass(r),
                                       icon: const Icon(
                                         Icons.edit_outlined,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  if (kind == 'exams')
+                                    IconButton(
+                                      tooltip: 'Delete exam',
+                                      onPressed: _loading
+                                          ? null
+                                          : () => _deleteExam(r),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
                                         size: 18,
                                       ),
                                     ),
@@ -2017,6 +2041,41 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
       name.dispose();
     } catch (e) {
       _toast('Could not edit class: $e');
+    }
+  }
+
+  Future<void> _deleteExam(AdminRow row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete exam?'),
+        content: Text(
+          'Permanently delete "${row['exam_title']}" and its questions, answers, attempts, rankings and monitoring logs? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete exam'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _loading = true);
+    try {
+      await ExamService().deleteExamSessionCompletely('${row['id']}');
+      if (!mounted) return;
+      _toast('Exam deleted.');
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        _toast('Could not delete exam: $e');
+      }
     }
   }
 

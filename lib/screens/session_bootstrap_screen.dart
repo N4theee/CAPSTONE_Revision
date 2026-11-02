@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/device_identity_service.dart';
+import '../services/device_management_service.dart';
 import '../services/local_session_service.dart';
 import '../services/supabase_service.dart';
 import 'home_screen.dart';
@@ -36,8 +37,26 @@ class _SessionBootstrapScreenState extends State<SessionBootstrapScreen> {
     }
 
     try {
+      // An explicit revoked result must never restore the old phone's session.
+      final valid = await DeviceManagementService().sessionValid(
+        saved.user.linkedId,
+        saved.deviceUuid,
+      );
+      if (!valid) {
+        await _local.clearUserSession();
+        if (mounted) _goHome();
+        return;
+      }
+    } catch (_) {
+      // Keep existing offline/bootstrap behavior until the server is reachable.
+      // The app-wide guard checks again in the foreground.
+    }
+
+    try {
       await _identity.getDeviceIdentity();
-      final status = await _db.getStudentActiveSessionStatus(saved.user.linkedId);
+      final status = await _db.getStudentActiveSessionStatus(
+        saved.user.linkedId,
+      );
 
       if (!mounted) return;
 
@@ -93,15 +112,13 @@ class _SessionBootstrapScreenState extends State<SessionBootstrapScreen> {
   }
 
   void _goHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

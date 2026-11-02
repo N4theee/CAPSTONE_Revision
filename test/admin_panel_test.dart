@@ -426,6 +426,7 @@ void main() {
     'Students',
     'Teachers',
     'Admins',
+    'Device Management',
     'Subjects',
     'Class Sections',
     'Enrollments',
@@ -459,6 +460,89 @@ void main() {
       await finish(tester);
     });
   }
+  testWidgets('Class Sections is searchable and read only, including details', (
+    tester,
+  ) async {
+    await mount(tester);
+    await navigate(tester, 'Class Sections');
+    expect(find.text('Create section'), findsNothing);
+    expect(find.text('Enroll students'), findsNothing);
+    expect(find.text('Curricula'), findsNothing);
+    requests.clear();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search sections'),
+      'ICT',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(
+      requests.any(
+        (r) => r.url.queryParameters['sections.section_name'] == 'ilike.%ICT%',
+      ),
+      isTrue,
+    );
+    await tester.tap(find.text('ICT 11-A (2026-2027)').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Juan Dela Cruz'), findsOneWidget);
+    expect(find.text('Enroll students / enroll next semester'), findsNothing);
+    await tester.tap(find.text('Subjects & Teachers'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set up semester'), findsNothing);
+    expect(find.text('Make semester ready'), findsNothing);
+    expect(find.text('Close semester'), findsNothing);
+    expect(find.text('Handling teacher: Nathan Orias'), findsOneWidget);
+    expect(requests.any((r) => r.method != 'GET'), isFalse);
+    await finish(tester);
+  });
+
+  testWidgets(
+    'exam deletion requires confirmation and cancellation preserves records',
+    (tester) async {
+      await mount(tester);
+      await navigate(tester, 'Exams');
+      requests.clear();
+      await tester.tap(find.byTooltip('Delete exam').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Delete exam?'), findsOneWidget);
+      expect(find.textContaining('cannot be undone'), findsOneWidget);
+      expect(requests.any((r) => r.method == 'DELETE'), isFalse);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(requests.any((r) => r.method == 'DELETE'), isFalse);
+      await finish(tester);
+    },
+  );
+
+  testWidgets(
+    'confirmed exam deletion removes related records before the session',
+    (tester) async {
+      await mount(tester);
+      await navigate(tester, 'Exams');
+      requests.clear();
+      await tester.tap(find.byTooltip('Delete exam').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete exam'));
+      await tester.pumpAndSettle();
+      final deletes = requests.where((r) => r.method == 'DELETE').toList();
+      expect(
+        deletes.map((r) => r.url.path.split('/').last),
+        containsAllInOrder([
+          'exam_answers',
+          'exam_choices',
+          'exam_questions',
+          'exam_rankings',
+          'exam_proximity_logs',
+          'exam_alerts',
+          'exam_attempts',
+          'exam_sessions',
+        ]),
+      );
+      expect(deletes.last.url.queryParameters['id'], 'eq.exam-1');
+      expect(find.text('Exam deleted.'), findsOneWidget);
+      await finish(tester);
+    },
+  );
+
   testWidgets(
     'section directory opens scoped student roster and teaching assignments',
     (tester) async {
@@ -616,10 +700,12 @@ void main() {
     tester,
   ) async {
     await mount(tester);
-    await navigate(tester, 'Class Sections');
-    await tester.tap(find.text('Review legacy subject classes'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Class Section').first);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: const Scaffold(body: AdminClassForm()),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Subject Code (ex: IT401)'), findsNothing);
     await choose(tester, 'Teacher', 'Nathan Orias ·');
@@ -653,10 +739,12 @@ void main() {
     tester,
   ) async {
     await mount(tester);
-    await navigate(tester, 'Class Sections');
-    await tester.tap(find.text('Review legacy subject classes'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Class Section').first);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: const Scaffold(body: AdminClassForm()),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
@@ -833,10 +921,12 @@ void main() {
     tester,
   ) async {
     await mount(tester);
-    await navigate(tester, 'Class Sections');
-    await tester.tap(find.text('Review legacy subject classes'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Create Class Section').first);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(useMaterial3: true),
+        home: const Scaffold(body: AdminClassForm()),
+      ),
+    );
     await tester.pumpAndSettle();
     await choose(tester, 'Teacher', 'Nathan Orias ·');
     await choose(tester, 'Subject', 'IT401 —');

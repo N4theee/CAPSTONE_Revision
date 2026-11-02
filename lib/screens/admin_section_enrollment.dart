@@ -24,10 +24,12 @@ class AdminSectionEnrollment extends StatefulWidget {
   const AdminSectionEnrollment({
     super.key,
     this.adminUsername = '',
+    this.readOnly = false,
     this.onLegacyClasses,
   });
   final VoidCallback? onLegacyClasses;
   final String adminUsername;
+  final bool readOnly;
   @override
   State<AdminSectionEnrollment> createState() => _AdminSectionEnrollmentState();
 }
@@ -44,6 +46,7 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
   int _tab = 0, _page = 0, _studentPage = 0, _request = 0;
   bool _busy = false;
   String? _error;
+  String _search = '';
 
   @override
   void initState() {
@@ -94,7 +97,7 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
         _subjects = subjects;
       } else {
         final rows = await (_tab == 0
-            ? _service.sections(page: _page)
+            ? _service.sections(page: _page, search: _search)
             : _tab == 1
             ? _service.curricula(page: _page)
             : _service.requests(page: _page));
@@ -115,6 +118,7 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
   }
 
   Future<bool> _command(String action, AdminRow data) async {
+    if (widget.readOnly) return false;
     final username = TextEditingController(text: widget.adminUsername);
     final password = TextEditingController();
     final credentials = await showDialog<(String, String)>(
@@ -583,16 +587,17 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
             children: [
               ListView(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: FilledButton.icon(
-                      onPressed: _busy ? null : () => _enroll(),
-                      icon: const Icon(Icons.group_add),
-                      label: const Text(
-                        'Enroll students / enroll next semester',
+                  if (!widget.readOnly)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: FilledButton.icon(
+                        onPressed: _busy ? null : () => _enroll(),
+                        icon: const Icon(Icons.group_add),
+                        label: const Text(
+                          'Enroll students / enroll next semester',
+                        ),
                       ),
                     ),
-                  ),
                   const Text(
                     'Students keep one section per school year. Enroll existing members again for a new ready semester; duplicates are prevented.',
                   ),
@@ -618,13 +623,16 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
               ),
               ListView(
                 children: [
-                  OutlinedButton(
-                    onPressed: _busy ? null : _addTerm,
-                    child: const Text('Set up semester'),
-                  ),
+                  if (!widget.readOnly)
+                    OutlinedButton(
+                      onPressed: _busy ? null : _addTerm,
+                      child: const Text('Set up semester'),
+                    ),
                   if (_terms.isEmpty)
-                    const Text(
-                      'Choose an approved curriculum to set up the first semester.',
+                    Text(
+                      widget.readOnly
+                          ? 'No semesters have been set up.'
+                          : 'Choose an approved curriculum to set up the first semester.',
                     ),
                   Wrap(
                     spacing: 8,
@@ -648,7 +656,9 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
                         ),
                     ],
                   ),
-                  if (_term != null && _term!['ready'] != true)
+                  if (!widget.readOnly &&
+                      _term != null &&
+                      _term!['ready'] != true)
                     FilledButton(
                       onPressed: _busy
                           ? null
@@ -661,7 +671,9 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
                             },
                       child: const Text('Make semester ready'),
                     ),
-                  if (_term?['ready'] == true && _term?['closed'] != true)
+                  if (!widget.readOnly &&
+                      _term?['ready'] == true &&
+                      _term?['closed'] != true)
                     OutlinedButton(
                       onPressed: _busy
                           ? null
@@ -717,6 +729,11 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
                                 final offering =
                                     a?['subject_offerings'] as Map?;
                                 final teacher = offering?['teachers'] as Map?;
+                                if (widget.readOnly) {
+                                  return Text(
+                                    'Handling teacher: ${teacher?['full_name'] ?? 'Unassigned'}',
+                                  );
+                                }
                                 return AdminRecordPicker(
                                   kind: 'teachers',
                                   label: 'Handling teacher',
@@ -757,29 +774,30 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
   Widget _directory() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          if (_tab == 0)
+      if (!widget.readOnly)
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            if (_tab == 0)
+              FilledButton.icon(
+                onPressed: _busy ? null : _createSection,
+                icon: const Icon(Icons.add),
+                label: const Text('Create section'),
+              ),
+            if (_tab == 1)
+              FilledButton.icon(
+                onPressed: _busy ? null : () => _createCurriculum(),
+                icon: const Icon(Icons.add),
+                label: const Text('New curriculum version'),
+              ),
             FilledButton.icon(
-              onPressed: _busy ? null : _createSection,
-              icon: const Icon(Icons.add),
-              label: const Text('Create section'),
+              onPressed: _busy ? null : () => _enroll(),
+              icon: const Icon(Icons.group_add),
+              label: const Text('Enroll students'),
             ),
-          if (_tab == 1)
-            FilledButton.icon(
-              onPressed: _busy ? null : () => _createCurriculum(),
-              icon: const Icon(Icons.add),
-              label: const Text('New curriculum version'),
-            ),
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _enroll(),
-            icon: const Icon(Icons.group_add),
-            label: const Text('Enroll students'),
-          ),
-        ],
-      ),
+          ],
+        ),
       const SizedBox(height: 12),
       if (_tab == 2)
         const Text(
@@ -865,26 +883,27 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
               icon: const Icon(Icons.arrow_back),
               label: const Text('Back'),
             ),
-          for (final entry in [
-            (0, 'Sections'),
-            (1, 'Curricula'),
-            (2, 'Student requests'),
-          ])
-            ChoiceChip(
-              label: Text(entry.$2),
-              selected: _tab == entry.$1,
-              onSelected: _busy
-                  ? null
-                  : (_) {
-                      setState(() {
-                        _tab = entry.$1;
-                        _page = 0;
-                        _section = _curriculum = _term = null;
-                        _rows = [];
-                      });
-                      _load();
-                    },
-            ),
+          if (!widget.readOnly)
+            for (final entry in [
+              (0, 'Sections'),
+              (1, 'Curricula'),
+              (2, 'Student requests'),
+            ])
+              ChoiceChip(
+                label: Text(entry.$2),
+                selected: _tab == entry.$1,
+                onSelected: _busy
+                    ? null
+                    : (_) {
+                        setState(() {
+                          _tab = entry.$1;
+                          _page = 0;
+                          _section = _curriculum = _term = null;
+                          _rows = [];
+                        });
+                        _load();
+                      },
+              ),
           IconButton(
             onPressed: _busy ? null : _load,
             tooltip: 'Refresh section enrollment',
@@ -892,7 +911,7 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
           ),
         ],
       ),
-      if (widget.onLegacyClasses != null)
+      if (!widget.readOnly && widget.onLegacyClasses != null)
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -901,6 +920,26 @@ class _AdminSectionEnrollmentState extends State<AdminSectionEnrollment> {
             label: const Text('Review legacy subject classes'),
           ),
         ),
+      if (widget.readOnly && _section == null) ...[
+        const Text(
+          'View sections, students, subjects and teachers. Manage changes in Enrollments.',
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          decoration: const InputDecoration(
+            labelText: 'Search sections',
+            hintText: 'Enter section name and press Enter',
+            prefixIcon: Icon(Icons.search),
+          ),
+          onSubmitted: (value) {
+            setState(() {
+              _search = value.trim();
+              _page = 0;
+            });
+            _load();
+          },
+        ),
+      ],
       const SizedBox(height: 16),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null)

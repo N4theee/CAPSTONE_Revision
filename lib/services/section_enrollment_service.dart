@@ -55,6 +55,7 @@ class SectionEnrollmentService {
 
   Future<List<AdminRow>> sections({
     int page = 0,
+    String search = '',
     String? year,
     int? grade,
     String? program,
@@ -62,8 +63,16 @@ class SectionEnrollmentService {
     var q = _db
         .from('school_sections')
         .select(
-          '*, sections(section_name), teachers(full_name), school_section_placements(count)',
+          '*, sections!inner(section_name), teachers(full_name), school_section_placements(count)',
         );
+    if (search.trim().isNotEmpty) {
+      final literal = search
+          .trim()
+          .replaceAll('\\', '\\\\')
+          .replaceAll('%', '\\%')
+          .replaceAll('_', '\\_');
+      q = q.ilike('sections.section_name', '%$literal%');
+    }
     if (year != null) q = q.eq('school_year', year);
     if (grade != null) q = q.eq('grade', grade);
     if (program != null) q = q.eq('program', program);
