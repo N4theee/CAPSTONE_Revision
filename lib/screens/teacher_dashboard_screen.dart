@@ -22,7 +22,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   final _db = SupabaseService();
   bool _loading = true;
   bool _loadFailed = false;
+  String? _sectionFilter;
   List<SubjectOffering> _offerings = [];
+  List<SubjectOffering> get _visibleOfferings => _sectionFilter == null
+      ? _offerings
+      : _offerings.where((o) => o.sectionId == _sectionFilter).toList();
   Map<String, int> _enrollmentByOffering = {};
   late String _displayName;
 
@@ -50,7 +54,14 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       );
       if (mounted) {
         setState(() {
+          rows.sort((a, b) {
+            final c = a.section.compareTo(b.section);
+            return c != 0 ? c : a.subjectTitle.compareTo(b.subjectTitle);
+          });
           _offerings = rows;
+          if (!rows.any((o) => o.sectionId == _sectionFilter)) {
+            _sectionFilter = null;
+          }
           _enrollmentByOffering = counts;
           _loading = false;
         });
@@ -233,6 +244,36 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                       ),
                       child: _buildHeader(),
                     ),
+                    if (!_loading && _offerings.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: pad,
+                          vertical: 8,
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey(_sectionFilter),
+                          initialValue: _sectionFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'Assigned section',
+                          ),
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('All assigned sections'),
+                            ),
+                            for (final entry in {
+                              for (final o in _offerings)
+                                o.sectionId: o.section,
+                            }.entries)
+                              DropdownMenuItem(
+                                value: entry.key,
+                                child: Text(entry.value),
+                              ),
+                          ],
+                          onChanged: (v) => setState(() => _sectionFilter = v),
+                        ),
+                      ),
                     Expanded(
                       child: _loading
                           ? const Center(
@@ -274,9 +315,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                                       ),
                                       physics:
                                           const AlwaysScrollableScrollPhysics(),
-                                      itemCount: _offerings.length,
+                                      itemCount: _visibleOfferings.length,
                                       itemBuilder: (_, i) {
-                                        final o = _offerings[i];
+                                        final o = _visibleOfferings[i];
                                         final n =
                                             _enrollmentByOffering[o.id] ?? 0;
                                         return CourseDashboardCard(

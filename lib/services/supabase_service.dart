@@ -393,6 +393,8 @@ class SupabaseService {
     required String password,
     String? deviceUuid,
     String? deviceName,
+    int? requestedGrade,
+    String? requestedProgram,
   }) async {
     final baseParams = {
       'p_student_id': studentId.trim(),
@@ -400,6 +402,21 @@ class SupabaseService {
       'p_username': username.trim(),
       'p_password': password.trim(),
     };
+    if (requestedGrade != null || requestedProgram != null) {
+      // Keep the installed device-aware registration implementation underneath
+      // an atomic request wrapper. Never fall back and silently lose preferences.
+      final result = await _db.rpc(
+        'register_student_with_section_request',
+        params: {
+          ...baseParams,
+          'p_device_uuid': deviceUuid,
+          'p_device_name': deviceName?.trim(),
+          'p_requested_grade': requestedGrade,
+          'p_requested_program': requestedProgram,
+        },
+      );
+      return result as String;
+    }
     try {
       final result = await _db.rpc(
         'register_student',

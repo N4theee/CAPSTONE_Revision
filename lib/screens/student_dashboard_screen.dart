@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/device_identity_service.dart';
 import '../services/local_session_service.dart';
 import '../services/supabase_service.dart';
+import '../services/section_enrollment_service.dart';
 import '../ui/responsive.dart';
 import '../ui/adaptive_layout.dart';
 import '../ui/student_attendance_ui.dart';
@@ -30,6 +31,8 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
   final _local = LocalSessionService();
   bool _loading = true;
   bool _loadFailed = false;
+  Map<String, dynamic> _placementInfo = {};
+  bool _placementFailed = false;
   List<SubjectOffering> _offerings = [];
   Map<String, int> _enrollmentByOffering = {};
   StreamSubscription<List<SessionNotificationItem>>? _notificationSub;
@@ -71,12 +74,23 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
       _loadFailed = false;
     });
     try {
+      Map<String, dynamic> placement = {};
+      bool placementFailed = false;
+      try {
+        placement = await SectionEnrollmentService().studentPlacement(
+          widget.user.linkedId,
+        );
+      } catch (_) {
+        placementFailed = true;
+      }
       final rows = await _db.getStudentOfferings(widget.user.linkedId);
       final counts = await _db.getEnrollmentCountsForOfferings(
         rows.map((e) => e.id).toList(),
       );
       if (mounted) {
         setState(() {
+          _placementInfo = placement;
+          _placementFailed = placementFailed;
           _offerings = rows;
           _enrollmentByOffering = counts;
           _loading = false;
@@ -276,6 +290,40 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
     );
   }
 
+  Widget _sectionBanner(double padding) {
+    final placement = _placementInfo['placement'] as Map?;
+    final section = placement?['school_sections'] as Map?;
+    final request = _placementInfo['request'] as Map?;
+    final title = _placementFailed
+        ? 'Section details could not be loaded. Pull down to refresh.'
+        : section != null
+        ? '${(section['sections'] as Map?)?['section_name'] ?? 'Assigned section'}'
+        : _offerings.isNotEmpty
+        ? 'Existing subject enrollments · Section placement awaits administrator review'
+        : 'Awaiting section assignment';
+    final detail = section != null
+        ? 'Grade ${section['grade']} · ${section['program']} · ${placement!['school_year']}'
+        : request != null
+        ? 'Requested Grade ${request['requested_grade']} · ${request['requested_program']} · Pending administrator approval'
+        : 'Your administrator assigns your section and its subjects.';
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(detail),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     final iconColor = Colors.white.withValues(alpha: 0.95);
     final compact = AppBreakpoints.useCompactDashboardActions(context);
@@ -445,6 +493,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                       ),
                       child: _buildHeader(),
                     ),
+                    if (!_loading) _sectionBanner(pad),
                     Expanded(
                       child: _loading
                           ? const Center(
@@ -464,11 +513,13 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                                   ? ListView(
                                       physics:
                                           const AlwaysScrollableScrollPhysics(),
-                                      children: const [
-                                        SizedBox(height: 120),
+                                      children: [
+                                        const SizedBox(height: 120),
                                         Center(
                                           child: Text(
-                                            'No enrolled courses yet.',
+                                            _placementInfo['placement'] != null
+                                                ? 'Awaiting subject enrollment for your assigned section. Contact the administrator.'
+                                                : 'Awaiting section assignment. Your subjects will appear after administrator enrollment.',
                                             style: TextStyle(
                                               color: Colors.white70,
                                               fontSize: 16,
@@ -496,7 +547,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen>
                                               '${o.subjectCode} - ${o.subjectTitle}',
                                           sectionLine: 'Section ${o.section}',
                                           footerLine:
-                                              '$n ${n == 1 ? 'student' : 'students'}',
+                                              '${o.teacherName} · $n ${n == 1 ? 'student' : 'students'}',
                                           cardTop: StudentAttendanceUi
                                               .dashboardCardTop,
                                           cardTopBorder: StudentAttendanceUi

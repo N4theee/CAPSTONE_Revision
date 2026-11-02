@@ -93,6 +93,29 @@ final _record = {
   'attendance_sessions': _session,
 };
 
+final _schoolSection = {
+  'id': 'school-section-1',
+  'section_id': 'section-1',
+  'school_year': '2026-2027',
+  'grade': 11,
+  'program': 'ICT',
+  'capacity': 45,
+  'sections': {'section_name': 'ICT 11-A (2026-2027)'},
+  'teachers': {'full_name': 'Nathan Orias'},
+  'school_section_placements': [
+    {'count': 1},
+  ],
+};
+final _schoolTerm = {
+  'id': 'term-1',
+  'school_section_id': 'school-section-1',
+  'curriculum_id': 'curriculum-1',
+  'semester': 1,
+  'ready': true,
+  'closed': false,
+  'school_curricula': {'version': 'Approved test'},
+};
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final requests = <http.Request>[];
@@ -140,6 +163,43 @@ void main() {
         }
         final path = request.url.path.split('/').last;
         dynamic data = switch (path) {
+          'school_sections' => [_schoolSection],
+          'school_section_terms' => [_schoolTerm],
+          'school_section_placements' => [
+            {
+              'student_id': 'student-1',
+              'students': _student,
+              'created_at': '2026-10-01',
+            },
+          ],
+          'school_curricula' => [
+            {
+              'id': 'curriculum-1',
+              'grade': 11,
+              'program': 'ICT',
+              'version': 'Approved test',
+              'approved': true,
+            },
+          ],
+          'school_curriculum_subjects' => [
+            {
+              'subject_id': 'subject-1',
+              'semester': 1,
+              'subjects': {
+                'subject_title': 'Application Development',
+                'subject_code': 'IT401',
+              },
+            },
+          ],
+          'school_teaching_assignments' => [
+            {
+              'subject_id': 'subject-1',
+              'offering_id': 'class-1',
+              'subject_offerings': _class,
+            },
+          ],
+          'school_student_requests' => [],
+          'admin_school_command' => {'enrolled': 1},
           'students' => [_student],
           'teachers' => [_teacher],
           'admins' => [
@@ -319,6 +379,27 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   }
 
+  Future<void> navigate(WidgetTester tester, String label) async {
+    final target = find.descendant(
+      of: find.byKey(const ValueKey('admin-navigation')),
+      matching: find.text(label),
+    );
+    await tester.scrollUntilVisible(
+      target,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> choose(WidgetTester tester, String label, String choice) async {
+    await tester.tap(find.text('Select $label').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining(choice).last);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('dashboard shows real summaries and saves desktop preview', (
     tester,
   ) async {
@@ -379,38 +460,66 @@ void main() {
     });
   }
   testWidgets(
-    'enrollments require subject and section before loading students',
+    'section directory opens scoped student roster and teaching assignments',
     (tester) async {
       await mount(tester);
-      await tester.tap(find.text('Enrollments').first);
-      await tester.pumpAndSettle();
+      await navigate(tester, 'Enrollments');
+      expect(find.textContaining('1/45 seats'), findsOneWidget);
       requests.clear();
-      await tester.tap(find.text('IT401').first);
-      await tester.pumpAndSettle();
-      expect(
-        requests.any(
-          (r) => r.url.path.endsWith('/student_subject_enrollments'),
-        ),
-        isFalse,
-      );
-      expect(
-        requests.any(
-          (r) => r.url.queryParameters['subject_id'] == 'eq.subject-1',
-        ),
-        isTrue,
-      );
-      await tester.tap(find.text('BSIT 4A').first);
+      await tester.tap(find.text('ICT 11-A (2026-2027)').first);
       await tester.pumpAndSettle();
       expect(find.text('Juan Dela Cruz'), findsOneWidget);
       expect(
         requests.any(
-          (r) => r.url.queryParameters['subject_offering_id'] == 'eq.class-1',
+          (r) =>
+              r.url.path.endsWith('/school_section_placements') &&
+              r.url.queryParameters['school_section_id'] ==
+                  'eq.school-section-1',
+        ),
+        isTrue,
+      );
+      await tester.tap(find.text('Subjects & Teachers'));
+      await tester.pumpAndSettle();
+      expect(find.text('Application Development'), findsOneWidget);
+      expect(
+        requests.any(
+          (r) =>
+              r.url.path.endsWith('/school_teaching_assignments') &&
+              r.url.queryParameters['term_id'] == 'eq.term-1',
         ),
         isTrue,
       );
       await finish(tester);
     },
   );
+  for (final width in [320.0, 390.0]) {
+    testWidgets(
+      'section workflow fits narrow screen $width with enlarged text',
+      (tester) async {
+        await mount(tester, width: width, scale: 2);
+        await tester.tap(find.byTooltip('Toggle navigation'));
+        await tester.pumpAndSettle();
+        await navigate(tester, 'Enrollments');
+        await tester.ensureVisible(find.text('ICT 11-A (2026-2027)').first);
+        await tester.tap(find.text('ICT 11-A (2026-2027)').first);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Subjects & Teachers'));
+        await tester.tap(find.text('Subjects & Teachers'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(find.text('Students').last);
+        await tester.tap(find.text('Students').last);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.text('Enroll students / enroll next semester'),
+        );
+        await tester.tap(find.text('Enroll students / enroll next semester'));
+        await tester.pumpAndSettle();
+        expect(find.text('Section enrollment'), findsOneWidget);
+        await finish(tester);
+      },
+    );
+  }
   testWidgets('question bank loads questions only after selecting an exam', (
     tester,
   ) async {
@@ -503,31 +612,13 @@ void main() {
     expect(find.textContaining('Could not load'), findsNothing);
     await finish(tester);
   });
-  Future<void> navigate(WidgetTester tester, String label) async {
-    final target = find.descendant(
-      of: find.byKey(const ValueKey('admin-navigation')),
-      matching: find.text(label),
-    );
-    await tester.scrollUntilVisible(
-      target,
-      180,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(target);
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> choose(WidgetTester tester, String label, String choice) async {
-    await tester.tap(find.text('Select $label').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining(choice).last);
-    await tester.pumpAndSettle();
-  }
-
   testWidgets('class creation chooses existing records and generates beacon', (
     tester,
   ) async {
     await mount(tester);
+    await navigate(tester, 'Class Sections');
+    await tester.tap(find.text('Review legacy subject classes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create Class Section').first);
     await tester.pumpAndSettle();
     expect(find.text('Subject Code (ex: IT401)'), findsNothing);
@@ -562,6 +653,9 @@ void main() {
     tester,
   ) async {
     await mount(tester);
+    await navigate(tester, 'Class Sections');
+    await tester.tap(find.text('Review legacy subject classes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create Class Section').first);
     await tester.pumpAndSettle();
     await tester.tap(
@@ -583,7 +677,15 @@ void main() {
     await choose(tester, 'Subject', 'IT401 —');
     await tester.tap(find.byType(SwitchListTile));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, 'BSIT 4B');
+    await tester.enterText(
+      find
+          .descendant(
+            of: find.byType(AdminClassForm),
+            matching: find.byType(TextField),
+          )
+          .first,
+      'BSIT 4B',
+    );
     await tester.tap(
       find.descendant(
         of: find.byType(AdminClassForm),
@@ -608,19 +710,31 @@ void main() {
         await choose(tester, 'Subject', 'IT401 —');
         await choose(tester, 'Exam', 'Prelim Examination ·');
         final table = pageTitle == 'Question Bank'
-            ? 'exam_questions'
+            ? 'exam_sessions'
             : 'exam_attempts';
         final query = requests
             .lastWhere((r) => r.url.path.endsWith('/$table'))
             .url
             .queryParameters;
-        expect(query['exam_sessions.teacher_id'], 'eq.teacher-1');
         expect(
-          query['exam_sessions.subject_offerings.subject_id'],
+          query[pageTitle == 'Question Bank'
+              ? 'teacher_id'
+              : 'exam_sessions.teacher_id'],
+          'eq.teacher-1',
+        );
+        expect(
+          query[pageTitle == 'Question Bank'
+              ? 'subject_offerings.subject_id'
+              : 'exam_sessions.subject_offerings.subject_id'],
           'eq.subject-1',
         );
-        expect(query['exam_session_id'], 'eq.exam-1');
-        expect(query['select'], contains('exam_sessions!inner'));
+        expect(
+          query[pageTitle == 'Question Bank' ? 'id' : 'exam_session_id'],
+          'eq.exam-1',
+        );
+        if (pageTitle != 'Question Bank') {
+          expect(query['select'], contains('exam_sessions!inner'));
+        }
         expect(query['select'], contains('subject_offerings!inner'));
         await tester.tap(find.text('Clear exam filters'));
         await tester.pumpAndSettle();
@@ -628,36 +742,73 @@ void main() {
             .lastWhere((r) => r.url.path.endsWith('/$table'))
             .url
             .queryParameters;
-        expect(clear.containsKey('exam_session_id'), isFalse);
-        expect(clear.containsKey('exam_sessions.teacher_id'), isFalse);
+        expect(
+          clear.containsKey(
+            pageTitle == 'Question Bank' ? 'id' : 'exam_session_id',
+          ),
+          isFalse,
+        );
+        expect(
+          clear.containsKey(
+            pageTitle == 'Question Bank'
+                ? 'teacher_id'
+                : 'exam_sessions.teacher_id',
+          ),
+          isFalse,
+        );
         await finish(tester);
       },
     );
   }
 
-  testWidgets('enrollment loads paged student and class choices', (
-    tester,
-  ) async {
-    await mount(tester);
-    await tester.tap(find.text('Enroll Student').first);
-    await tester.pumpAndSettle();
-    await choose(tester, 'Student', 'Juan Dela Cruz ·');
-    await choose(tester, 'Class', 'IT401 · BSIT 4A ·');
-    await tester.tap(find.text('Save Enrollment'));
-    await tester.pumpAndSettle();
-    final request = requests.singleWhere(
-      (r) => r.url.path.endsWith('/admin_assign_student_to_offering'),
-    );
-    expect(jsonDecode(request.body), {
-      'p_student_id': 'student-1',
-      'p_offering_id': 'class-1',
-    });
-    expect(
-      requests.any((r) => r.url.path.endsWith('/get_admin_enrollments')),
-      isFalse,
-    );
-    await finish(tester);
-  });
+  testWidgets(
+    'section enrollment previews subjects and uses verified bulk RPC',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.text('Enroll Student').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enroll students'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select section'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('ICT 11-A (2026-2027)').last);
+      await tester.pumpAndSettle();
+      await choose(tester, 'Student (add to selection)', 'Juan Dela Cruz ·');
+      expect(find.text('Application Development'), findsOneWidget);
+      await tester.ensureVisible(
+        find.text('Confirm enrollment for 1 student(s)'),
+      );
+      await tester.tap(find.text('Confirm enrollment for 1 student(s)'));
+      await tester.pumpAndSettle();
+      expect(
+        requests.any((r) => r.url.path.endsWith('/admin_school_command')),
+        isFalse,
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Admin password'),
+        'test-password',
+      );
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      final request = requests.singleWhere(
+        (r) => r.url.path.endsWith('/admin_school_command'),
+      );
+      final data = jsonDecode(request.body);
+      expect(data['p_action'], 'enroll');
+      expect(data['p_data'], {
+        'term_id': 'term-1',
+        'student_ids': ['student-1'],
+      });
+      expect(data['p_username'], 'admin');
+      expect(
+        requests.any(
+          (r) => r.url.path.endsWith('/admin_assign_student_to_offering'),
+        ),
+        isFalse,
+      );
+      await finish(tester);
+    },
+  );
 
   test(
     'dropdown search and exam options are scoped to a bounded page',
@@ -682,6 +833,9 @@ void main() {
     tester,
   ) async {
     await mount(tester);
+    await navigate(tester, 'Class Sections');
+    await tester.tap(find.text('Review legacy subject classes'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Create Class Section').first);
     await tester.pumpAndSettle();
     await choose(tester, 'Teacher', 'Nathan Orias ·');

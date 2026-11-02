@@ -24,7 +24,7 @@ work if this optional summary function is unavailable.
 | Admins | Existing administrator directory and name editing |
 | Subjects | Create, edit, and view assigned class sections |
 | Class Sections | Searchable teacher/subject/section choices, optional new section, automatic beacon identifier, enrolled students, teacher/beacon editing, active/inactive setting |
-| Enrollments | Paged student/active-class choice pickers and removal workflow and individual removal with confirmation |
+| Enrollments | Curriculum drafts, fixed annual sections, semester teacher assignments, registration requests and atomic single/bulk section placement |
 | Exams | Teacher-owned exam oversight, attempts, questions, and incidents |
 | Question Bank | Server-side teacher, subject, and exam filters; review existing exam questions and answer choices; no independent global question pool |
 | Attempt Logs | Server-side teacher, subject, and exam filters; scores, durations, violations, paged Bluetooth monitoring history |
@@ -74,4 +74,6 @@ The SQL uses the existing table permissions rather than elevating callers.
 These changes reduce competing requests; no deployed database load test has
 been performed, so they do not establish a guaranteed simultaneous-user limit.
 
-Enrollments now opens a subject directory with enrolled section and teacher summaries and enrollment counts. Select a subject, then a section and its handling teacher, to load the paged student roster. Question Bank opens an exam directory; selecting an exam loads only its questions in question order. Teacher, subject, exam, and date filters apply to the exam directory.
+Enrollments now opens a section directory with capacity, curriculum, teacher assignments and fixed annual student placement. Open a section to view Students or Subjects & Teachers. Question Bank opens an exam directory; selecting an exam loads only its questions in question order. Teacher, subject, exam, and date filters apply to the exam directory.
+
+The new fixed-section enrollment workflow and database setup are documented in `docs/section_enrollment.md`. The older subject-grouped enrollment directory is replaced by section placement; Class Sections remains available for legacy record review.

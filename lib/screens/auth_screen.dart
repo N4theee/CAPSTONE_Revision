@@ -9,6 +9,7 @@ import '../services/ble_service.dart';
 import '../services/device_identity_service.dart';
 import '../services/local_session_service.dart';
 import '../services/supabase_service.dart';
+import '../services/section_enrollment_service.dart';
 import '../ui/landing_auth_ui.dart';
 import '../ui/responsive.dart';
 import '../util/network_connectivity.dart';
@@ -33,6 +34,8 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passCtrl = TextEditingController();
   final _studentIdCtrl = TextEditingController();
   final _fullNameCtrl = TextEditingController();
+  int? _requestedGrade;
+  String? _requestedProgram;
   bool _loading = false;
   bool _isRegister = false;
   bool _rememberMe = false;
@@ -113,6 +116,12 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    if (_role == 'student' &&
+        _isRegister &&
+        (_requestedGrade == null || _requestedProgram == null)) {
+      _showMessage('Select your requested grade level and program.');
+      return;
+    }
     setState(() => _loading = true);
     try {
       if (_role == 'student' && _isRegister) {
@@ -124,6 +133,8 @@ class _AuthScreenState extends State<AuthScreen> {
           password: _passCtrl.text,
           deviceUuid: deviceInfo.deviceUuid,
           deviceName: deviceInfo.deviceName,
+          requestedGrade: _requestedGrade,
+          requestedProgram: _requestedProgram,
         );
       }
 
@@ -170,6 +181,9 @@ class _AuthScreenState extends State<AuthScreen> {
       if (!mounted) return;
       final offline = networkErrorMessage(e);
       final mapped =
+          (e is PostgrestException && e.code == 'PGRST202' && _isRegister
+              ? 'Registration setup is missing. Ask the administrator to apply the section enrollment database update.'
+              : null) ??
           offline ??
           (_role == 'student' ? _studentDeviceLoginMessage(e) : null);
       _showMessage(mapped ?? 'Auth failed: $e');
@@ -250,6 +264,48 @@ class _AuthScreenState extends State<AuthScreen> {
                                   const SizedBox(height: 16),
                                 ],
                                 if (_role == 'student' && _isRegister) ...[
+                                  DropdownButtonFormField<int>(
+                                    initialValue: _requestedGrade,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Requested grade level',
+                                    ),
+                                    items: [
+                                      for (final grade in [11, 12])
+                                        DropdownMenuItem(
+                                          value: grade,
+                                          child: Text('Grade $grade'),
+                                        ),
+                                    ],
+                                    onChanged: _loading
+                                        ? null
+                                        : (v) => setState(
+                                            () => _requestedGrade = v,
+                                          ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  DropdownButtonFormField<String>(
+                                    initialValue: _requestedProgram,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Requested program / strand',
+                                    ),
+                                    items: [
+                                      for (final program in schoolPrograms)
+                                        DropdownMenuItem(
+                                          value: program,
+                                          child: Text(program),
+                                        ),
+                                    ],
+                                    onChanged: _loading
+                                        ? null
+                                        : (v) => setState(
+                                            () => _requestedProgram = v,
+                                          ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'The administrator will approve your section assignment after registration.',
+                                  ),
+                                  const SizedBox(height: 12),
                                   TextField(
                                     controller: _studentIdCtrl,
                                     textInputAction: TextInputAction.next,

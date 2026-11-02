@@ -7,6 +7,7 @@ import '../util/admin_export.dart';
 import 'admin_operations_panel.dart';
 import 'admin_record_picker.dart';
 import 'admin_class_form.dart';
+import 'admin_section_enrollment.dart';
 import 'home_screen.dart';
 
 class AdminWebPanelScreen extends StatefulWidget {
@@ -226,6 +227,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   final _year = TextEditingController();
   String _selected = 'dashboard', _reportKind = 'records';
   bool _collapsed = false, _loading = true, _exporting = false;
+  bool _showLegacyClasses = false;
   String? _error, _chartError, _status;
   AdminRow? _filterTeacher, _filterSubject, _filterExam;
   DateTimeRange? _range;
@@ -345,6 +347,9 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
           _summary = summary;
           _chartError = chartError;
         });
+      } else if (_selected == 'enrollments' ||
+          (_selected == 'classes' && !_showLegacyClasses)) {
+        // Section enrollment owns its independently scoped directory queries.
       } else if (kind != 'settings') {
         final rows = await _data.page(
           kind,
@@ -378,6 +383,7 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   void _navigate(String key) {
     setState(() {
       _selected = key;
+      _showLegacyClasses = false;
       _enrollmentSubject = _enrollmentClass = _questionExam = null;
       _page = 0;
       _status = null;
@@ -671,6 +677,19 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
                           _settings()
                         else if (_selected == 'activity')
                           _activity()
+                        else if (_selected == 'enrollments' ||
+                            (_selected == 'classes' && !_showLegacyClasses))
+                          AdminSectionEnrollment(
+                            key: ValueKey(_selected),
+                            onLegacyClasses: () {
+                              setState(() {
+                                _selected = 'classes';
+                                _showLegacyClasses = true;
+                              });
+                              _load();
+                            },
+                            adminUsername: widget.user?.username ?? '',
+                          )
                         else
                           _directory(),
                       ],
@@ -1759,6 +1778,14 @@ class _AdminWebPanelScreenState extends State<AdminWebPanelScreen> {
   }
 
   Future<void> _operation(int section) async {
+    if (section == 1 && !_showLegacyClasses) {
+      _navigate('classes');
+      return;
+    }
+    if (section == 2) {
+      _navigate('enrollments');
+      return;
+    }
     if (section == 1 || section == 2) {
       await showDialog<void>(
         context: context,
